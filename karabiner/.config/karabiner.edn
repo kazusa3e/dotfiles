@@ -1,0 +1,152 @@
+; DOC: <https://github.com/yqrashawn/GokuRakuJoudo/blob/master/examples.org>
+; keycode:
+; <https://github.com/yqrashawn/GokuRakuJoudo/blob/0046266e8dccda65c7a2213c7b4b8a02a3d713a6/src/karabiner_configurator/keys_info.clj>
+{
+    :profiles {
+        :default {:default true :alone 2000 }
+    }
+
+    :devices {
+        :apple [{:vendor_id 1452 :product_id 832}]
+        :ikbc [{:vendor_id 1241 :product_id 521}]
+        :iqunix [{:vendor_id 12815 :product_id 20525}]
+    }
+
+    :input-sources {
+        :en {:input_source_id "" :language "en"}
+        :zh {:input_source_id "" :language "zh-Hans"}
+        :jp {:input_source_id "" :language "ja"}
+    }
+
+    ; osascript -e 'id of app "010 editor"'
+    :applications {
+        :preview ["^com\\.apple\\.Preview$"]
+        :skim ["^net\\.sourceforge\\.skim-app\\.skim$"]
+        :safari ["^com\\.apple\\.Safari$"]
+        :typora ["^abnerworks\\.Typora$"]
+        :010editor ["^com\\.SweetScape\\.010Editor$"]
+    }
+
+    :templates {
+        :hammerspoon "open -g \"hammerspoon://%s?%s\""
+    }
+
+    :layers {
+        :tab-layer {:key :tab}
+        :caps-layer {:key :caps_lock :alone {:input :en}}
+        :escape-layer {:key :escape}
+        ; :iqunix-rcmd-layer {:key :right_command :alone {:key :vk_none}}
+        :iqunix-ropt-layer {:key :right_option :alone {:key :play_or_pause}}
+    }
+
+    :simlayers {
+    }
+
+    :main [
+
+        {:des "[caps-layer] app special hotkey" :rules [:caps-layer
+            ; skim.app
+            ; <caps-a>: highlight <caps-s>: underline <caps-d>: anchor
+            [:##a :!CTh [:skim]] [:##s :!CSm [:skim]] [:##d :!COn [:skim]]
+            ; <caps-q>: toc <caps-e>: notes
+            [:##q :!CSt [:skim]] [:##e :!CSn [:skim]]
+
+            ; preview.app
+            ; <caps-a>: hide sidebar <caps-s>: thumbnail <caps-d>: toc
+            ; [:##a :!CO1 [:preview]] [:##s :!CO2 [:preview]] [:##d :!CO3 [:preview]]
+
+            ; safari.app
+            ; <caps-a>: reading list <caps-x>: close others <caps-d>: add to reading list
+            ; [:##a :!CT2 [:safari]] [:##x :!COw [:safari]] [:##d :!CSd [:safari]]
+
+            ; typora.app
+            ; <caps-a>: highlight <caps-q>: toc
+            ; [:##a :!CSh [:typora]] [:##q :!CT1 [:typora]]
+
+            ; 010 editor.app
+            ; <caps-a> mark
+            [:##a :!Cb [:010editor]]
+        ]}
+
+        {:des "[apple only] swap fn or l_ctrl" :rules [:apple
+            [:##fn :left_control] [:##left_control :left_option]
+        ]}
+
+        {:des "[ikbc only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:ikbc
+            [:##right_shift {:mkey {:vwheel 64}}]
+            [:##right_control {:mkey {:vwheel -64}}]
+        ]}
+
+        {:des "command m -> command q, command q -> command o" :rules [
+            [:!Cm :!Cq] [:!Cq :!Co] [:!Co :vk_none]
+        ]}
+
+        {:des "command d -> hyper d (conflict with skim bookmark)" :rules [
+            [:!Cd :!!d] [:!Cq :!Co] [:!Co :vk_none]
+        ]}
+
+        {:des "[tab layer] window manager" :rules [:tab-layer
+            [:t [:hammerspoon "wm" "app=iTerm2"]]
+            [:f [:hammerspoon "wm" "app=Finder"]]
+            [:q [:hammerspoon "wm" "app=Screenshot"]]
+            [:w [:hammerspoon "wm" "app=Skim"]]
+            [:e [:hammerspoon "wm" "app=Typora"]]
+            [:s [:hammerspoon "wm" "app=Microsoft Edge"]]
+            [:c [:hammerspoon "wm" "app=Visual Studio Code"]]
+            [:r [:hammerspoon "wm" "app=Microsoft Remote Desktop"]]
+            [:z [:hammerspoon "wm" "app=Visual Studio Code - Insiders"]]
+            [:spacebar [:hammerspoon "wm" "app=Chromium"]]
+            [:j [:hammerspoon "wm" "app=Obsidian"]]
+
+            ; ime
+            [:##k {:input :zh}] [:##l {:input :jp}]
+        ]}
+
+        {:des "[escape layer] escape + <NUM> -> F<NUM>" :rules [:escape-layer
+            [:##1 :f1] [:##2 :f2] [:##3 :f3] [:##4 :f4] [:##5 :f5]
+        ]}
+
+        {:des "[iqunix only] fix tilde" :rules [:iqunix
+            [:!Sescape :!Sgrave_accent_and_tilde]
+            [:!Qescape :grave_accent_and_tilde]
+            [:!Qw :up_arrow]
+            [:!Qs :down_arrow]
+            [:!Qa :left_arrow]
+            [:!Qd :right_arrow]
+            ; [:right_command :vk_none]
+        ]}
+
+        ; {:des "[iqunix only] [rcmd-layer]" :rules [:iqunix :iqunix-rcmd-layer
+        ;     [:##w :up_arrow]
+        ;     [:##s :down_arrow]
+        ;     [:##a :left_arrow]
+        ;     [:##d :right_arrow]
+        ;     [:##escape :grave_accent_and_tilde]
+        ;     [:##1 :f1]
+        ;     ; TODO: Fn keys
+        ; ]}
+
+        {:des "[iqunix only] [ropt-layer] window arrangement" :rules [:iqunix :iqunix-ropt-layer
+            [:w [:hammerspoon "win-sizing" "method=up"]]
+            [:s [:hammerspoon "win-sizing" "method=down"]]
+            [:a [:hammerspoon "win-sizing" "method=left"]]
+            [:d [:hammerspoon "win-sizing" "method=right"]]
+            [:q [:hammerspoon "win-sizing" "method=q"]]
+            [:e [:hammerspoon "win-sizing" "method=e"]]
+            [:z [:hammerspoon "win-sizing" "method=z"]]
+            [:c [:hammerspoon "win-sizing" "method=c"]]
+            [:x [:hammerspoon "win-sizing" "method=center"]]
+            [:spacebar [:hammerspoon "win-sizing" "method=max"]]
+            [:r [:hammerspoon "win-sizing" "method=r"]]
+            [:t [:hammerspoon "win-sizing" "method=t"]]
+            [:o [:hammerspoon "win-sizing" "method=o"]]
+            [:p [:hammerspoon "win-sizing" "method=p"]]
+        ]}
+
+        {:des "[iqunix only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:iqunix
+            [:##right_shift {:mkey {:vwheel 64}}]
+            [:##right_control {:mkey {:vwheel -64}}]
+        ]}
+
+    ]
+}

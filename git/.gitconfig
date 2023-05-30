@@ -1,0 +1,22 @@
+[core]
+	ignorecase = false
+	quotepath = false
+	excludesfile = ~/.gitignore
+
+[user]
+	email = i@kazusa.me
+	name = kazusa
+    signingkey = 98822059682FE03381FA16F299F850C685650613
+
+[commit]
+    gpgsign = false
+
+[status]
+    submodulesummary = 1
+
+[init]
+	defaultBranch = master
+
+[pull]
+	ff = only
+	rebase = true
