@@ -80,11 +80,7 @@ fi
 # fi
 
 # zoxide
-if [ $(uname -s) = "Darwin" ]; then
-    eval "$(zoxide init zsh --cmd j)"
-fi
-if [ $(uname -s) = "Linux" ]; then
-fi
+eval "$(zoxide init zsh --cmd j)"
 
 # gpg
 export GPG_TTY=$TTY
@@ -103,7 +99,7 @@ precmd() { print "" }
 [ $(uname -s) = "Darwin" ] && export ZK_NOTEBOOK_DIR="$HOME/wiki/"
 
 # man pager
-export MANPAGER='nvim +Man!'
+export MANPAGER='lvim +Man!'
 
 # java
 if [ $(uname -s) = "Darwin" ]; then
