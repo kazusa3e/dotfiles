@@ -1,11 +1,11 @@
 os := $(shell uname -s)
 
 ifeq ($(os),Darwin)
-	app := zsh tmux git starship vim gh hammerspoon karabiner clash idea lunarvim
+	app := zsh tmux git starship vim gh hammerspoon karabiner clash idea lunarvim clang
 endif
 
 ifeq ($(os),Linux)
-	app := zsh tmux git starship vim gh idea lunarvim
+	app := zsh tmux git starship vim gh idea lunarvim clang
 endif
 
 .PHONY: install
