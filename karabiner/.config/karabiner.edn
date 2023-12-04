@@ -10,7 +10,8 @@
         :apple [{:vendor_id 1452 :product_id 832}]
         :ikbc [{:vendor_id 1241 :product_id 521}]
         :iqunix [{:vendor_id 12815 :product_id 20525}]
-        :keychron [{:vendor_id 13364 :product_id 704}]
+        :keychron-wired [{:vendor_id 13364 :product_id 704}]
+        :keychron-bt [{:vendor_id 13364 :product_id 640}]
     }
 
     :input-sources {
@@ -72,7 +73,11 @@
             [:##fn :left_control] [:##left_control :left_option]
         ]}
 
-        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron
+        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron-wired
+            [:##right_shift {:mkey {:vwheel 64}}]
+            [:##right_control {:mkey {:vwheel -64}}]
+        ]}
+        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron-bt
             [:##right_shift {:mkey {:vwheel 64}}]
             [:##right_control {:mkey {:vwheel -64}}]
         ]}
@@ -123,7 +128,10 @@
             [:p [:hammerspoon "win-sizing" "method=p"]]
         ]}
 
-        {:des "[keychron only] fix tilde" :rules [:keychron
+        {:des "[keychron only] fix tilde" :rules [:keychron-wired
+            [:!Sescape :!Sgrave_accent_and_tilde]
+        ]}
+        {:des "[keychron only] fix tilde" :rules [:keychron-bt
             [:!Sescape :!Sgrave_accent_and_tilde]
         ]}
 
