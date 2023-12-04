@@ -10,6 +10,7 @@
         :apple [{:vendor_id 1452 :product_id 832}]
         :ikbc [{:vendor_id 1241 :product_id 521}]
         :iqunix [{:vendor_id 12815 :product_id 20525}]
+        :keychron [{:vendor_id 13364 :product_id 704}]
     }
 
     :input-sources {
@@ -35,8 +36,7 @@
         :tab-layer {:key :tab}
         :caps-layer {:key :caps_lock :alone {:input :en}}
         :escape-layer {:key :escape}
-        ; :iqunix-rcmd-layer {:key :right_command :alone {:key :vk_none}}
-        :iqunix-ropt-layer {:key :right_option :alone {:key :play_or_pause}}
+        :ropt-layer {:key :right_option :alone {:key :play_or_pause}}
     }
 
     :simlayers {
@@ -72,7 +72,7 @@
             [:##fn :left_control] [:##left_control :left_option]
         ]}
 
-        {:des "[ikbc only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:ikbc
+        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron
             [:##right_shift {:mkey {:vwheel 64}}]
             [:##right_control {:mkey {:vwheel -64}}]
         ]}
@@ -96,7 +96,7 @@
             [:r [:hammerspoon "wm" "app=Microsoft Remote Desktop"]]
             [:z [:hammerspoon "wm" "app=Visual Studio Code - Insiders"]]
             [:spacebar [:hammerspoon "wm" "app=Chromium"]]
-            [:j [:hammerspoon "wm" "app=Obsidian"]]
+            ; [:j [:hammerspoon "wm" "app=Obsidian"]]
 
             ; ime
             [:##k {:input :zh}] [:##l {:input :jp}]
@@ -106,27 +106,7 @@
             [:##1 :f1] [:##2 :f2] [:##3 :f3] [:##4 :f4] [:##5 :f5]
         ]}
 
-        {:des "[iqunix only] fix tilde" :rules [:iqunix
-            [:!Sescape :!Sgrave_accent_and_tilde]
-            [:!Qescape :grave_accent_and_tilde]
-            [:!Qw :up_arrow]
-            [:!Qs :down_arrow]
-            [:!Qa :left_arrow]
-            [:!Qd :right_arrow]
-            ; [:right_command :vk_none]
-        ]}
-
-        ; {:des "[iqunix only] [rcmd-layer]" :rules [:iqunix :iqunix-rcmd-layer
-        ;     [:##w :up_arrow]
-        ;     [:##s :down_arrow]
-        ;     [:##a :left_arrow]
-        ;     [:##d :right_arrow]
-        ;     [:##escape :grave_accent_and_tilde]
-        ;     [:##1 :f1]
-        ;     ; TODO: Fn keys
-        ; ]}
-
-        {:des "[iqunix only] [ropt-layer] window arrangement" :rules [:iqunix :iqunix-ropt-layer
+        {:des "[ropt layer] window arrangement & resizing" :rules [:ropt-layer
             [:w [:hammerspoon "win-sizing" "method=up"]]
             [:s [:hammerspoon "win-sizing" "method=down"]]
             [:a [:hammerspoon "win-sizing" "method=left"]]
@@ -143,9 +123,8 @@
             [:p [:hammerspoon "win-sizing" "method=p"]]
         ]}
 
-        {:des "[iqunix only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:iqunix
-            [:##right_shift {:mkey {:vwheel 64}}]
-            [:##right_control {:mkey {:vwheel -64}}]
+        {:des "[keychron only] fix tilde" :rules [:keychron
+            [:!Sescape :!Sgrave_accent_and_tilde]
         ]}
 
     ]
