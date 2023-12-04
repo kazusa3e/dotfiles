@@ -73,6 +73,10 @@
             [:##fn :left_control] [:##left_control :left_option]
         ]}
 
+        {:des "rcmd -> next track" :rules [
+            [:##right_command :vk_consumer_next]
+        ]}
+
         {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron-wired
             [:##right_shift {:mkey {:vwheel 64}}]
             [:##right_control {:mkey {:vwheel -64}}]
