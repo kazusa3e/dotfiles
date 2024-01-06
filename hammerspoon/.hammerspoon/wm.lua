@@ -28,8 +28,7 @@ local function createInstance(app)
             { 'File', 'New Finder Window' }
         )
     elseif app == 'Skim' then
-        hs.appfinder.appFromName(app):selectMenuItem(
-            { 'File', 'Open...' }
+        hs.appfinder.appFromName(app):selectMenuItem( { 'File', 'Open...' }
         )
     elseif app == 'Typora' then
         hs.appfinder.appFromName(app):selectMenuItem(
@@ -94,6 +93,6 @@ hs.hotkey.bind({ 'cmd' }, 'e', function()
 end)
 
 hs.hotkey.bind({ 'cmd' }, 'escape', function()
-    focus("Chromium");
+    -- focus("Chromium");
     hs.eventtap.keyStroke({ 'cmd' }, "8");
 end)
