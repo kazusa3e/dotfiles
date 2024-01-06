@@ -14,7 +14,9 @@ install:
 	if [ "$(os)" = "Darwin" ]; then \
 		ln -s "$(PWD)/lazygit/.config/lazygit/config.yml" "$(HOME)/Library/Application Support/lazygit/config.yml"; \
 	fi
-	goku
+	if [ "$(os)" = "Darwin" ]; then \
+		goku \
+	fi
 
 .PHONY: uninstall
 uninstall:
