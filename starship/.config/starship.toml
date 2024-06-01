@@ -1,0 +1,42 @@
+add_newline = false
+
+format = """\
+    $username\
+    $hostname\
+    $directory\
+    $git_branch\
+    $git_metrics\
+    $cmd_duration\
+    $python\
+    $jobs\
+    $line_break\
+    $character\
+    """
+
+[character]
+success_symbol = "[ ➜ ](bold green)"
+error_symbol = "[ ✗ ](bold red)"
+
+[hostname]
+ssh_symbol = "  "
+
+[directory]
+truncation_length = 3
+format = "[  $path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+truncation_symbol = ""
+symbol = "  "
+
+[git_metrics]
+disabled = true
+
+[custom.tmux]
+command = "tmux display-message -p '#S (#W:#{window_index}/#{session_windows}) #{?window_zoomed_flag,❄,}'"
+style = "bold blue"
+when = """ test "$TMUX" """
+format = "  [$output]($style) ➜ "
+
+[python]
+symbol = "Py "
+disabled = false
