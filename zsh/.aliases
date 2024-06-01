@@ -1,0 +1,77 @@
+# ls
+alias l="eza --classify --reverse --sort=modified"
+alias ll="eza --classify --all --long --reverse --sort=modified"
+
+# git
+alias gl="git log --color --graph --pretty=format:'%Cred%h%Creset - %s%C(yellow)%d%Creset %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit $*"
+alias gla="gl --all $*"
+alias gs="git status -sb $*"
+alias gb="git branch $*"
+alias gd="git diff $*"
+alias gdp="git diff HEAD^ $*"
+alias gds="git diff --staged $*"
+alias gco="git checkout $*"
+alias gaa="git add -A"
+function gcm() {
+    if [ "$1" ]; then
+        git commit -m "$1"
+    else
+        git commit
+    fi
+}
+alias gph="git push $*"
+alias gpl="git pull $*"
+alias gr="git remote $*"
+function ga () {
+    p=${PWD##*/}
+    git archive --verbose --output "$p.tar" HEAD
+}
+alias gcn="git clean -fd && git reset --hard HEAD"
+
+# tmux
+function t () {
+    p=${PWD##*/}
+    case "$1" in
+        n)
+            if [[ -z "$2" ]]; then
+                tmux new-session -d -s $p
+            else
+                tmux new-session -d -s "$2"
+            fi
+            ;;
+        x)
+            if [[ -z "$2" ]]; then
+                tmux new-session -s $p
+            else
+                tmux new-session -s "$2"
+            fi
+            ;;
+        a)
+            if [[ -z "$2" ]]; then
+                tmux attach -t $p
+            else
+                tmux attach -t "$2"
+            fi
+            ;;
+        d)
+            cd
+            tmux attach -t tmp || tmux new-session -s tmp
+            ;;
+        k)
+            tmux kill-session -t "$2"
+            ;;
+        l)
+            tmux ls
+            ;;
+    esac
+}
+
+# gpg
+function gpgd () {
+    gpg --decrypt --output ${1%".gpg"} $1
+}
+
+
+alias bat="bat -p $*"
+
+# vim: ft=zsh

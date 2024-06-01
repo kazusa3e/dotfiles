@@ -1,0 +1,10 @@
+BasedOnStyle: Google
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 0
+IncludeBlocks: Merge
+AllowShortEnumsOnASingleLine: true
+BreakBeforeBraces: Attach
+AccessModifierOffset: -4
+IndentCaseLabels: true

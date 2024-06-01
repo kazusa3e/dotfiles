@@ -1,0 +1,29 @@
+[core]
+	ignorecase = false
+	quotepath = false
+	excludesfile = ~/.gitignore
+	; pager = diff-so-fancy | less --tabs=4 -RF
+
+[user]
+	email = i@kazusa.me
+	name = kazusa
+    signingkey = 98822059682FE03381FA16F299F850C685650613
+
+[commit]
+    gpgsign = false
+
+[status]
+    submodulesummary = 1
+
+[init]
+	defaultBranch = main
+
+[pull]
+	ff = only
+	rebase = true
+
+[color]
+	ui = auto
+
+[interactive]
+	; diffFilter = diff-so-fancy --patch

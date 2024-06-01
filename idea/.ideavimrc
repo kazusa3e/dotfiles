@@ -1,0 +1,24 @@
+" Source your .vimrc
+" source ~/.vimrc
+
+let mapleader=" "
+set surround
+map X <Action>(CloseEditor)
+map <leader>x  <Action>(CloseAllEditors)
+map <leader>f <Action>(GotoFile)
+map <leader>p <Action>(GotoSymbol)
+" map <leader>P <Action>(GotoProjectSymbol)
+map gr <Action>(ShowUsages)
+map gR <Action>(RenameElement)
+map j gj
+map k gk
+map o o<esc>
+map qq <Action>(CommentByLineComment)
+map <C-h> <C-w>h
+map <C-l> <C-w>l
+map <C-j> <C-w>j
+map <C-k> <C-w>k
+map <leader>\\ <Action>(MoveTabDown)
+map <leader>| <Action>(MoveTabRight)
+
+map gd <Action>(GotoDeclarationOnly)

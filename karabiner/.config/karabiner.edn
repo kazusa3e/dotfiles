@@ -1,0 +1,160 @@
+; DOC: <https://github.com/yqrashawn/GokuRakuJoudo/blob/master/examples.org>
+; keycode:
+; <https://github.com/yqrashawn/GokuRakuJoudo/blob/0046266e8dccda65c7a2213c7b4b8a02a3d713a6/src/karabiner_configurator/keys_info.clj>
+{
+    :profiles {
+        :default {:default true :alone 2000 }
+    }
+
+    :devices {
+        :apple [{:vendor_id 1452 :product_id 832}]
+        :ikbc [{:vendor_id 1241 :product_id 521}]
+        :iqunix [{:vendor_id 12815 :product_id 20525}]
+        ; :keychron-wired [{:vendor_id 13364 :product_id 704}]
+        :keychron-bt [{:vendor_id 13364 :product_id 704}]
+    }
+
+    :input-sources {
+        :en {:input_source_id "" :language "en"}
+        :zh {:input_source_id "" :language "zh-Hans"}
+        :jp {:input_source_id "" :language "ja"}
+    }
+
+    ; osascript -e 'id of app "010 editor"'
+    :applications {
+        :preview ["^com\\.apple\\.Preview$"]
+        :skim ["^net\\.sourceforge\\.skim-app\\.skim$"]
+        :safari ["^com\\.apple\\.Safari$"]
+        :typora ["^abnerworks\\.Typora$"]
+        :010editor ["^com\\.SweetScape\\.010Editor$"]
+    }
+
+    :templates {
+        :hammerspoon "open -g \"hammerspoon://%s?%s\""
+    }
+
+    :layers {
+        :tab-layer {:key :tab}
+        ; :caps-layer {:key :caps_lock :alone {:input :en}}
+        :caps-layer {:key :caps_lock :alone {:key :f18}}
+        :escape-layer {:key :escape}
+        :ropt-layer {:key :right_option :alone {:key :play_or_pause}}
+    }
+
+    :simlayers {
+    }
+
+    :main [
+
+        {:des "[caps-layer] app special hotkey" :rules [:caps-layer
+
+            ; vim mode
+            [:##j :down_arrow] [:##k :up_arrow] [:##h :left_arrow] [:##l :right_arrow]
+
+            ; ime
+            [:##n :f19]
+
+            ; skim.app
+            ; <caps-a>: highlight <caps-s>: underline <caps-d>: anchor
+            [:##a :!CTh [:skim]] [:##s :!CSm [:skim]] [:##d :!COn [:skim]]
+            ; <caps-q>: toc <caps-e>: notes
+            [:##q :!CSt [:skim]] [:##e :!CSn [:skim]]
+
+            ; preview.app
+            ; <caps-a>: hide sidebar <caps-s>: thumbnail <caps-d>: toc
+            ; [:##a :!CO1 [:preview]] [:##s :!CO2 [:preview]] [:##d :!CO3 [:preview]]
+
+            ; safari.app
+            ; <caps-a>: reading list <caps-x>: close others <caps-d>: add to reading list
+            ; [:##a :!CT2 [:safari]] [:##x :!COw [:safari]] [:##d :!CSd [:safari]]
+
+            ; typora.app
+            ; <caps-a>: highlight <caps-q>: toc
+            ; [:##a :!CSh [:typora]] [:##q :!CT1 [:typora]]
+
+            ; 010 editor.app
+            ; <caps-a> mark
+            ; [:##a :!Cb [:010editor]]
+
+
+
+        ]}
+
+        {:des "[apple only] swap fn or l_ctrl" :rules [:apple
+            [:##fn :left_control] [:##left_control :left_option]
+        ]}
+
+        {:des "rcmd -> next track" :rules [
+            [:##right_command :vk_consumer_next]
+        ]}
+
+        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron-wired
+            [:##right_shift {:mkey {:vwheel 64}}]
+            [:##right_control {:mkey {:vwheel -64}}]
+        ]}
+        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron-bt
+            [:##right_shift {:mkey {:vwheel 64}}]
+            [:##right_control {:mkey {:vwheel -64}}]
+        ]}
+
+        {:des "command m -> command q, command q -> command o" :rules [
+            [:!Cm :!Cq] [:!Cq :!Co] [:!Co :vk_none]
+        ]}
+
+        {:des "command d -> hyper d (conflict with skim bookmark)" :rules [
+            [:!Cd :!!d] [:!Cq :!Co] [:!Co :vk_none]
+        ]}
+
+        {:des "[tab layer] window manager" :rules [:tab-layer
+            [:t [:hammerspoon "wm" "app=iTerm2"]]
+            [:f [:hammerspoon "wm" "app=Finder"]]
+            [:q [:hammerspoon "wm" "app=Screenshot"]]
+            [:w [:hammerspoon "wm" "app=Skim"]]
+            ; [:e [:hammerspoon "wm" "app=Typora"]]
+            [:s [:hammerspoon "wm" "app=Microsoft Edge"]]
+            ; [:c [:hammerspoon "wm" "app=Visual Studio Code"]]
+            [:c [:hammerspoon "wm" "app=Code"]]
+            ; [:r [:hammerspoon "wm" "app=Microsoft Remote Desktop"]]
+            [:r [:hammerspoon "wm" "app=Windows App"]]
+            ; [:z [:hammerspoon "wm" "app=Visual Studio Code - Insiders"]]
+            [:z [:hammerspoon "wm" "app=Zotero"]]
+            ; [:spacebar [:hammerspoon "wm" "app=Chromium"]]
+            ; [:o [:hammerspoon "wm" "app=Obsidian"]]
+            [:e [:hammerspoon "wm" "app=Obsidian"]]
+
+            [:delete_or_backspace :delete_forward]
+
+            ; ime
+            ; [:##k {:input :zh}] [:##l {:input :jp}]
+        ]}
+
+        {:des "[escape layer] escape + <NUM> -> F<NUM>" :rules [:escape-layer
+            [:##1 :f1] [:##2 :f2] [:##3 :f3] [:##4 :f4] [:##5 :f5]
+        ]}
+
+        {:des "[ropt layer] window arrangement & resizing" :rules [:ropt-layer
+            [:w [:hammerspoon "win-sizing" "method=up"]]
+            [:s [:hammerspoon "win-sizing" "method=down"]]
+            [:a [:hammerspoon "win-sizing" "method=left"]]
+            [:d [:hammerspoon "win-sizing" "method=right"]]
+            [:q [:hammerspoon "win-sizing" "method=q"]]
+            [:e [:hammerspoon "win-sizing" "method=e"]]
+            [:z [:hammerspoon "win-sizing" "method=z"]]
+            [:c [:hammerspoon "win-sizing" "method=c"]]
+            [:x [:hammerspoon "win-sizing" "method=center"]]
+            [:spacebar [:hammerspoon "win-sizing" "method=max"]]
+            [:r [:hammerspoon "win-sizing" "method=r"]]
+            [:t [:hammerspoon "win-sizing" "method=t"]]
+            [:o [:hammerspoon "win-sizing" "method=o"]]
+            [:p [:hammerspoon "win-sizing" "method=p"]]
+        ]}
+
+        {:des "[keychron only] fix tilde" :rules [:keychron-wired
+            [:!Sescape :!Sgrave_accent_and_tilde]
+        ]}
+        {:des "[keychron only] fix tilde" :rules [:keychron-bt
+            [:!Sescape :!Sgrave_accent_and_tilde]
+        ]}
+
+    ]
+}
