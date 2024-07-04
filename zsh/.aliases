@@ -70,20 +70,5 @@ function gpgd () {
     gpg --decrypt --output ${1%".gpg"} $1
 }
 
-# docker
-function dkr () {
-    # docker run --rm -it -v .:/app -w "/app" --user dev $@
-    docker run --rm -it --user dev $@
-}
-
-# copilot
-alias exp="gh copilot explain $*"
-alias sug="gh copilot suggest -t shell $*"
-
-# Quick start with the default Taskfile template
-alias run-init="curl -so Taskfile https://raw.githubusercontent.com/adriancooney/Taskfile/master/Taskfile.template && chmod +x Taskfile"
-
-# Run your tasks like: run <task>
-# alias run=./Taskfile
 
 # vim: ft=zsh

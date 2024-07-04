@@ -35,7 +35,8 @@
 
     :layers {
         :tab-layer {:key :tab}
-        :caps-layer {:key :caps_lock :alone {:input :en}}
+        ; :caps-layer {:key :caps_lock :alone {:input :en}}
+        :caps-layer {:key :caps_lock :alone {:key :f18}}
         :escape-layer {:key :escape}
         :ropt-layer {:key :right_option :alone {:key :play_or_pause}}
     }
@@ -110,7 +111,7 @@
             [:o [:hammerspoon "wm" "app=Obsidian"]]
 
             ; ime
-            [:##k {:input :zh}] [:##l {:input :jp}]
+            ; [:##k {:input :zh}] [:##l {:input :jp}]
         ]}
 
         {:des "[escape layer] escape + <NUM> -> F<NUM>" :rules [:escape-layer

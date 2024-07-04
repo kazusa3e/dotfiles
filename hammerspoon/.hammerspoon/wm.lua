@@ -83,7 +83,7 @@ hs.hotkey.bind({ 'cmd' }, 'e', function()
 end)
 
 hs.hotkey.bind({ 'cmd' }, 'escape', function()
-    focus('Chromium');
+    -- focus('Chromium');
     focus('Mail');
     hs.eventtap.keyStroke({ 'cmd' }, '8')
 end)

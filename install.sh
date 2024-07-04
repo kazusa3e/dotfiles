@@ -133,15 +133,27 @@ EOF
     if [ "$(id -u)" -eq 0 ]; then
         apk update
         # TODO: vivid
-        apk add --no-cache tzdata zsh vim tmux starship git stow make zoxide eza fzf shadow
+        apk add --no-cache tzdata zsh vim tmux starship git stow make zoxide fzf shadow wget
+
+        wget -c https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz -O - | tar xz
+        chmod +x eza
+        chown root:root eza
+        mv eza /usr/local/bin/eza
+
         su - $M_USER -c "$script"
-        chsh -s /bin/zsh $M_USER
+        usermod -s /bin/zsh $M_USER
     else
         sudo apk update
         # TODO: vivid
-        sudo apk add --no-cache tzdata zsh vim tmux starship git stow make zoxide eza fzf shadow
+        sudo apk add --no-cache tzdata zsh vim tmux starship git stow make zoxide fzf shadow wget
+
+        wget -c https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz -O - | tar xz
+        sudo chmod +x eza
+        sudo chown root:root eza
+        sudo mv eza /usr/local/bin/eza
+
         sh -c "$script"
-        sudo chsh -s /bin/zsh $M_USER
+        sudo usermod -s /bin/zsh $M_USER
     fi
 }
 
