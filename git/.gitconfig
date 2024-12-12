@@ -16,7 +16,7 @@
     submodulesummary = 1
 
 [init]
-	defaultBranch = master
+	defaultBranch = main
 
 [pull]
 	ff = only
