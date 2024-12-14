@@ -1,7 +1,7 @@
 os := $(shell uname -s)
 
 ifeq ($(os),Darwin)
-	app := zsh vim tmux starship git clang karabiner idea hammerspoon
+	app := zsh vim tmux starship git clang karabiner idea hammerspoon brew
 endif
 
 ifeq ($(os),Linux)
