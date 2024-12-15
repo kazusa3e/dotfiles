@@ -90,3 +90,5 @@ cask "snipaste"
 cask "tailscale"
 # Open-source code editor
 cask "visual-studio-code"
+# Collect, organise, cite, and share research sources
+cask "zotero"
