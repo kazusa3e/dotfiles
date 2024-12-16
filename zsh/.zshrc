@@ -7,9 +7,6 @@ export LC_ALL=en_US.UTF-8
 # vim mode
 bindkey -v
 
-# python
-alias python="python3 $*"
-
 # zplug
 export ZPLUG_HOME=$HOME/.zplug
 [ $(uname -s) = "Darwin" ] && export ZPLUG_HOME=/usr/local/opt/zplug
@@ -18,8 +15,6 @@ zplug "zsh-users/zsh-completions"
 zplug "zsh-users/zsh-autosuggestions"
 zplug "zsh-users/zsh-syntax-highlighting"
 zplug "lib/completion", from:oh-my-zsh
-# zplug "sainnhe/dotfiles", as:theme, use:".zsh-theme/edge-light.zsh"
-# zplug "MichaelAquilina/zsh-autoswitch-virtualenv"
 if zplug check || zplug install; then
       zplug load
 fi
@@ -30,15 +25,19 @@ eval "$(starship init zsh)"
 # theme
 export LS_COLORS="$(vivid generate ayu)"
 
-# java home
-# export JAVA_HOME=$(/usr/libexec/java_home)
-
-
 # local bin
 export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 if [ $(uname -s) = "Darwin" ]; then
     export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+fi
+
+# scripts
+if [ -d $HOME/Code/scripts ]; then      # Darwin
+    export PATH="$HOME/Code/scripts:$PATH"
+fi
+if [ -d $HOME/scripts ]; then           # Linux
+    export PATH="$HOME/scripts:$PATH"
 fi
 
 # coreutils
@@ -59,7 +58,6 @@ fi
 
 # fzf
 if [ $(uname -s) = "Darwin" ]; then
-    # [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
     eval "$(fzf --zsh)"
 fi
 if [ $(uname -s) = "Linux" ]; then
@@ -94,14 +92,5 @@ setopt HIST_IGNORE_ALL_DUPS     # overwrite older history when dups occur
 unsetopt PROMPT_SP
 precmd() { print "" }
 
-# wiki notebook
-[ $(uname -s) = "Darwin" ] && export ZK_NOTEBOOK_DIR="$HOME/wiki/"
-
 # man pager
 export MANPAGER='nvim +Man!'
-
-# java
-if [ $(uname -s) = "Darwin" ]; then
-    export PATH="$(brew --prefix openjdk)/bin:$PATH"
-    export JAVA_HOME="$(brew --prefix openjdk)/libexec"
-fi

@@ -9,6 +9,8 @@ brew "glib"
 brew "cmake"
 # Modern, maintained replacement for ls
 brew "eza"
+# Monitor a directory for changes and run a shell command
+brew "fswatch"
 # Command-line fuzzy finder written in Go
 brew "fzf"
 # GitHub command-line tool
