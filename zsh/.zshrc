@@ -34,10 +34,10 @@ fi
 
 # scripts
 if [ -d $HOME/Code/scripts ]; then      # Darwin
-    export PATH="$HOME/Code/scripts:$PATH"
+    export PATH="$HOME/Code/scripts/.bin:$PATH"
 fi
 if [ -d $HOME/scripts ]; then           # Linux
-    export PATH="$HOME/scripts:$PATH"
+    export PATH="$HOME/scripts/.bin:$PATH"
 fi
 
 # coreutils
