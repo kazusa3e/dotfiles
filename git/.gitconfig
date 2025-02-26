@@ -24,5 +24,6 @@
 
 [color]
 	ui = auto
+
 [interactive]
 	; diffFilter = diff-so-fancy --patch

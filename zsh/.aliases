@@ -71,4 +71,6 @@ function gpgd () {
 }
 
 
+alias bat="bat -p $*"
+
 # vim: ft=zsh

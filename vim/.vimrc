@@ -7,19 +7,18 @@ set number
 set backspace=indent,eol,start
 filetype plugin indent on
 syntax on
-" set clipboard=unnamed
 set encoding=utf-8
 set noswapfile
 set undofile
 set undodir=$HOME/.vim/undo
-set nocursorline
+set cursorline
 set autoread
 set updatetime=500
 set scrolloff=5
 let mapleader=' '
 set mouse=
 autocmd FileType * set formatoptions-=cro
-" set signcolumn=number
+set signcolumn=number
 set sessionoptions+=tabpages,globals
 set nrformats+=alpha
 set ttimeoutlen=5
@@ -28,7 +27,6 @@ set ttimeoutlen=5
 " indent {{{
 set tabstop=4
 set shiftwidth=0
-" set softtabstop=4
 set expandtab
 set autoindent
 set smartindent
@@ -80,12 +78,12 @@ set foldmethod=expr
 " }}}
 
 " markdown {{{
-autocmd FileType markdown setlocal conceallevel=0
-autocmd FileType markdown setlocal textwidth=0
+autocmd FileType markdown setlocal conceallevel=2
+" autocmd FileType markdown setlocal textwidth=0
 " autocmd FileType markdown setlocal spell
-autocmd FileType markdown setlocal nowrap
-autocmd FileType markdown setlocal foldmethod=expr
-autocmd FileType markdown setlocal foldexpr=GetPotionFold(v:lnum)
+" autocmd FileType markdown setlocal nowrap
+" autocmd FileType markdown setlocal foldmethod=expr
+" autocmd FileType markdown setlocal foldexpr=GetPotionFold(v:lnum)
 " nnoremap <leader>nn <cmd>e $HOME/todo.md<cr>
 " }}}
 
@@ -139,6 +137,10 @@ inoremap <c-k> <esc><c-w>k
 nnoremap <leader>hn <cmd>tabnew<cr>
 nnoremap <leader>he <cmd>tabnext<cr>
 nnoremap <leader>hx <cmd>tabclose<cr>
+
+tnoremap <leader>hn <cmd>tabnew<cr>
+tnoremap <leader>he <cmd>tabnext<cr>
+tnoremap <leader>hx <cmd>tabclose<cr>
 " }}}
 
 " split {{{
@@ -195,7 +197,20 @@ set background=light
 " endfunction
 " }}}
 
+
+
+
 nnoremap j gj
 nnoremap k gk
+
+inoremap <C-e> <esc>A
+inoremap <C-a> <esc>I
+
+command DiffOrig vert new | set buftype=nofile | read ++edit # | 0d_ | diffthis | wincmd p | diffthis
+nnoremap <leader>gds <cmd>DiffOrig<cr>
+
+xnoremap <silent> s y/<C-R>=escape(@", '/\')<CR><CR>
+
+nnoremap <leader>Y <cmd>%y+<cr>
 
 " vim: foldmethod=marker
