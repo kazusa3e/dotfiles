@@ -141,10 +141,6 @@ nnoremap ]q <cmd>cn<cr>
 nnoremap <leader>hn <cmd>tabnew<cr>
 nnoremap <leader>he <cmd>tabnext<cr>
 nnoremap <leader>hx <cmd>tabclose<cr>
-
-tnoremap <leader>hn <cmd>tabnew<cr>
-tnoremap <leader>he <cmd>tabnext<cr>
-tnoremap <leader>hx <cmd>tabclose<cr>
 " }}}
 
 " split {{{
