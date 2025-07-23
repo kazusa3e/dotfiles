@@ -92,5 +92,10 @@ setopt HIST_IGNORE_ALL_DUPS     # overwrite older history when dups occur
 unsetopt PROMPT_SP
 precmd() { print "" }
 
+# rustup
+if [ $(uname -s) = "Darwin" ]; then
+    export PATH="/usr/local/opt/rustup/bin:$PATH"
+fi
+
 # man pager
 export MANPAGER='nvim +Man!'
