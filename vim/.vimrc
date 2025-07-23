@@ -193,7 +193,12 @@ endif
 " }}}
 
 " colorscheme {{{
-set background=light
+let s:use_theme = getenv('USE_THEME')
+if s:use_theme == "light"
+    set background=light
+else
+    set background=dark
+endif
 " }}}
 
 " edit {{{
