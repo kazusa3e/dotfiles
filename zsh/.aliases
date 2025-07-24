@@ -27,6 +27,7 @@ function ga () {
     git archive --verbose --output "$p.tar" HEAD
 }
 alias gcn="git clean -fd && git reset --hard HEAD"
+alias gg="lazygit"
 
 # tmux
 function t () {
