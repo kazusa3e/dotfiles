@@ -31,7 +31,7 @@ set shiftwidth=0
 set expandtab
 set autoindent
 set smartindent
-set textwidth=80
+set textwidth=0
 set wrap
 " }}}
 
