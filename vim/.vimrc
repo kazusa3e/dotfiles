@@ -129,6 +129,11 @@ inoremap <c-h> <esc><c-w>h
 inoremap <c-l> <esc><c-w>l
 inoremap <c-j> <esc><c-w>j
 inoremap <c-k> <esc><c-w>k
+
+nnoremap <s-h> <c-w><
+nnoremap <s-l> <c-w>>
+nnoremap <s-j> <c-w>-
+nnoremap <s-k> <c-w>+
 " }}}
 
 " quickfix {{{
@@ -166,10 +171,6 @@ nnoremap O O<esc>
 " quick move {{{
 nnoremap j gj
 nnoremap k gk
-nnoremap J 5j
-nnoremap K 5k
-nnoremap H 5h
-nnoremap L 5l
 " }}}
 
 " indent {{{
