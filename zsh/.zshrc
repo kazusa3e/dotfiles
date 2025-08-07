@@ -92,6 +92,7 @@ export HISTFILE="$HOME/.zsh_history"
 export HISTSIZE=10000
 export SAVEHIST=$HISTSIZE
 setopt HIST_IGNORE_ALL_DUPS     # overwrite older history when dups occur
+setopt INC_APPEND_HISTORY       # write history file immediately
 
 # fix lost of last line without line break
 unsetopt PROMPT_SP
@@ -104,3 +105,8 @@ fi
 
 # man pager
 export MANPAGER='nvim +Man!'
+
+# <c-e> to edit this command here
+autoload -z edit-command-line
+zle -N edit-command-line
+bindkey "^E" edit-command-line
