@@ -8,10 +8,11 @@
 
     :devices {
         :apple [{:vendor_id 1452 :product_id 832}]
-        :ikbc [{:vendor_id 1241 :product_id 521}]
+        :ikbc-poker2 [{:vendor_id 1241 :product_id 521}]
         :iqunix [{:vendor_id 12815 :product_id 20525}]
         ; :keychron-wired [{:vendor_id 13364 :product_id 704}]
-        :keychron-bt [{:vendor_id 13364 :product_id 704}]
+        :keychron-12pro [{:vendor_id 13364 :product_id 704}]
+        :nuphy-air60-he [{:vendor_id 6645 :product_id 65248}]
     }
 
     :input-sources {
@@ -92,7 +93,7 @@
             [:##right_shift {:mkey {:vwheel 64}}]
             [:##right_control {:mkey {:vwheel -64}}]
         ]}
-        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron-bt
+        {:des "[keychron only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:keychron-12pro
             [:##right_shift {:mkey {:vwheel 64}}]
             [:##right_control {:mkey {:vwheel -64}}]
         ]}
@@ -152,7 +153,10 @@
         {:des "[keychron only] fix tilde" :rules [:keychron-wired
             [:!Sescape :!Sgrave_accent_and_tilde]
         ]}
-        {:des "[keychron only] fix tilde" :rules [:keychron-bt
+        {:des "[keychron only] fix tilde" :rules [:keychron-12pro
+            [:!Sescape :!Sgrave_accent_and_tilde]
+        ]}
+        {:des "[nuphy-air60-he only] fix tilde" :rules [:nuphy-air60-he
             [:!Sescape :!Sgrave_accent_and_tilde]
         ]}
 
