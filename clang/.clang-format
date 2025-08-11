@@ -8,3 +8,4 @@ AllowShortEnumsOnASingleLine: true
 BreakBeforeBraces: Attach
 AccessModifierOffset: -4
 IndentCaseLabels: true
+Cpp11BracedListStyle: false
