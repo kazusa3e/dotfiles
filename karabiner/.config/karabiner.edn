@@ -97,6 +97,10 @@
             [:##right_shift {:mkey {:vwheel 64}}]
             [:##right_control {:mkey {:vwheel -64}}]
         ]}
+        {:des "[nyphy only] r_shift -> scroll up, r_ctrl -> scroll down" :rules [:nuphy-air60-he
+            [:##right_shift {:mkey {:vwheel 64}}]
+            [:##right_control {:mkey {:vwheel -64}}]
+        ]}
 
         {:des "command m -> command q, command q -> command o" :rules [
             [:!Cm :!Cq] [:!Cq :!Co] [:!Co :vk_none]
@@ -158,6 +162,16 @@
         ]}
         {:des "[nuphy-air60-he only] fix tilde" :rules [:nuphy-air60-he
             [:!Sescape :!Sgrave_accent_and_tilde]
+        ]}
+
+        {:des "[keychron only] remap screen lock and screenshot" :rules [:keychron-wired
+            [:!CTq :!Oq] [:!Ol :!CTq]
+        ]}
+        {:des "[keychron only] remap screen lock and screenshot" :rules [:keychron-12pro
+            [:!CTq :!Oq] [:!Ol :!CTq]
+        ]}
+        {:des "[nuphy-air60-he only] remap screen lock and screenshot" :rules [:nuphy-air60-he
+            [:!CTq :!Oq] [:!Ol :!CTq]
         ]}
 
     ]
