@@ -27,3 +27,5 @@
 
 [interactive]
 	; diffFilter = diff-so-fancy --patch
+[push]
+	autoSetupRemote = true
