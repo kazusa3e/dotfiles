@@ -6,7 +6,7 @@ ifeq ($(os),Linux)
 endif
 
 # TODO: git global ignore files
-app := zsh vim tmux starship git clang lazygit
+app := zsh vim tmux starship git clang lazygit alacritty
 
 # TODO: scoop app lists
 

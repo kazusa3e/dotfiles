@@ -1,0 +1,76 @@
+[general]
+live_config_reload = true
+
+[font]
+# normal = {family = "Maple Mono NF CN"}
+normal = {family = "ComicShannsMono Nerd Font Mono", style = "Regular"}
+bold = {family = "ComicShannsMono Nerd Font Mono", style = "Bold"}
+italic = {family = "ComicShannsMono Nerd Font Mono", style = "Italic"}
+bold_italic = {family = "ComicShannsMono Nerd Font Mono", style = "Bold Italic"}
+size = 12.0
+
+[window]
+padding = {x = 8, y = 4}
+
+[terminal]
+osc52 = "CopyPaste"
+
+# # Colors (One Dark)
+#
+# # Default colors
+# [colors.primary]
+# background = '#282c34'
+# foreground = '#abb2bf'
+#
+# # Normal colors
+# [colors.normal]
+# black   = '#1e2127'
+# red     = '#e06c75'
+# green   = '#98c379'
+# yellow  = '#d19a66'
+# blue    = '#61afef'
+# magenta = '#c678dd'
+# cyan    = '#56b6c2'
+# white   = '#abb2bf'
+#
+# # Bright colors
+# [colors.bright]
+# black   = '#5c6370'
+# red     = '#e06c75'
+# green   = '#98c379'
+# yellow  = '#d19a66'
+# blue    = '#61afef'
+# magenta = '#c678dd'
+# cyan    = '#56b6c2'
+# white   = '#ffffff'
+
+
+# Colors (Ayu Mirage)
+
+# Default Colors
+[colors.primary]
+background = "#1f2430"
+foreground = "#cbccc6"
+bright_foreground = "#f28779"
+
+# Normal colors
+[colors.normal]
+black = "#212733"
+red = "#f08778"
+green = "#53bf97"
+yellow = "#fdcc60"
+blue = "#60b8d6"
+magenta = "#ec7171"
+cyan = "#98e6ca"
+white = "#fafafa"
+
+# Bright colors
+[colors.bright]
+black = "#686868"
+red = "#f58c7d"
+green = "#58c49c"
+yellow = "#ffd165"
+blue = "#65bddb"
+magenta = "#f17676"
+cyan = "#9debcf"
+white = "#ffffff"
