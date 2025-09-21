@@ -79,7 +79,7 @@ set foldmethod=expr
 " }}}
 
 " markdown {{{
-autocmd FileType markdown setlocal conceallevel=2
+" autocmd FileType markdown setlocal conceallevel=2
 " autocmd FileType markdown setlocal textwidth=0
 " autocmd FileType markdown setlocal spell
 " autocmd FileType markdown setlocal nowrap
