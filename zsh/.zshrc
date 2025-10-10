@@ -23,7 +23,7 @@ fi
 eval "$(starship init zsh)"
 
 # theme
-export LS_COLORS="$(vivid generate ayu)"
+# export LS_COLORS="$(vivid generate ayu)"
 if [[ -z "$USE_THEME" ]]; then
     export USE_THEME=dark
 fi
