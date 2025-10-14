@@ -112,3 +112,7 @@ export MANPAGER='nvim +Man!'
 autoload -z edit-command-line
 zle -N edit-command-line
 bindkey "^E" edit-command-line
+
+if [ -f ~/.zshrc.local ]; then
+    source ~/.zshrc.local
+fi
