@@ -104,6 +104,7 @@ precmd() { print "" }
 if [ $(uname -s) = "Darwin" ]; then
     export PATH="/usr/local/opt/rustup/bin:$PATH"
 fi
+export PATH="$HOME/.cargo/bin:$PATH"
 
 # man pager
 export MANPAGER='nvim +Man!'

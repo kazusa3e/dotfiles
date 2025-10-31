@@ -75,6 +75,6 @@ function gpgd () {
 
 alias bat="bat -p $*"
 
-alias mk="make -f local.mk $*"
+alias mk="make -f cmd.mk $*"
 
 # vim: ft=zsh
