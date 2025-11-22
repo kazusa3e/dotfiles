@@ -1,0 +1,182 @@
+{
+    "buckets": [
+        {
+            "Name": "main",
+            "Source": "https://github.com/ScoopInstaller/Main",
+            "Updated": {
+                "value": "\/Date(1763599244000)\/",
+                "DisplayHint": 2,
+                "DateTime": "Thursday, November 20, 2025 8:40:44 AM"
+            },
+            "Manifests": 1413
+        },
+        {
+            "Name": "extras",
+            "Source": "https://github.com/ScoopInstaller/Extras",
+            "Updated": {
+                "value": "\/Date(1763599203000)\/",
+                "DisplayHint": 2,
+                "DateTime": "Thursday, November 20, 2025 8:40:03 AM"
+            },
+            "Manifests": 2211
+        },
+        {
+            "Name": "versions",
+            "Source": "https://github.com/ScoopInstaller/Versions",
+            "Updated": {
+                "value": "\/Date(1763584393000)\/",
+                "DisplayHint": 2,
+                "DateTime": "Thursday, November 20, 2025 4:33:13 AM"
+            },
+            "Manifests": 538
+        },
+        {
+            "Name": "nerd-fonts",
+            "Source": "https://github.com/matthewjberger/scoop-nerd-fonts",
+            "Updated": {
+                "value": "\/Date(1762611617000)\/",
+                "DisplayHint": 2,
+                "DateTime": "Saturday, November 9, 2025 10:20:17 PM"
+            },
+            "Manifests": 367
+        },
+        {
+            "Name": "nonportable",
+            "Source": "https://github.com/ScoopInstaller/Nonportable",
+            "Updated": {
+                "value": "\/Date(1763570765000)\/",
+                "DisplayHint": 2,
+                "DateTime": "Thursday, November 20, 2025 12:46:05 AM"
+            },
+            "Manifests": 128
+        }
+    ],
+    "apps": [
+        {
+            "Info": "",
+            "Source": "main",
+            "Name": "7zip",
+            "Version": "25.01",
+            "Updated": "\/Date(1761055233861)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "alacritty",
+            "Version": "0.16.1",
+            "Updated": "\/Date(1761055390047)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "anki",
+            "Version": "25.09",
+            "Updated": "\/Date(1763601041424)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "autohotkey",
+            "Version": "2.0.19",
+            "Updated": "\/Date(1761221659535)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "cherry-studio",
+            "Version": "1.6.7",
+            "Updated": "\/Date(1763600066967)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "foobar2000",
+            "Version": "2.25.3",
+            "Updated": "\/Date(1761872155306)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "foobar2000-encoders",
+            "Version": "2025-08-29",
+            "Updated": "\/Date(1761453487447)\/"
+        },
+        {
+            "Info": "",
+            "Source": "nonportable",
+            "Name": "mactype-np",
+            "Version": "2021.1-rc1",
+            "Updated": "\/Date(1761979964243)\/"
+        },
+        {
+            "Info": "",
+            "Source": "nerd-fonts",
+            "Name": "Maple-Mono-NF-CN",
+            "Version": "7.8",
+            "Updated": "\/Date(1761057228112)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "nomeiryoui",
+            "Version": "3.4.0",
+            "Updated": "\/Date(1761980588995)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "obsidian",
+            "Version": "1.10.3",
+            "Updated": "\/Date(1763600569022)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "potplayer",
+            "Version": "250909",
+            "Updated": "\/Date(1762094408856)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "powertoys",
+            "Version": "0.96.0",
+            "Updated": "\/Date(1763600765311)\/"
+        },
+        {
+            "Info": "Held package",
+            "Source": "nerd-fonts",
+            "Name": "SarasaGothic-SC",
+            "Version": "1.0.33",
+            "Updated": "\/Date(1763600902026)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "snipaste",
+            "Version": "2.10.8",
+            "Updated": "\/Date(1761221642346)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "telegram",
+            "Version": "6.3.1",
+            "Updated": "\/Date(1763600919796)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "vscode",
+            "Version": "1.106.2",
+            "Updated": "\/Date(1763600959126)\/"
+        },
+        {
+            "Info": "",
+            "Source": "extras",
+            "Name": "zotero",
+            "Version": "7.0.27",
+            "Updated": "\/Date(1761142851652)\/"
+        }
+    ]
+}
