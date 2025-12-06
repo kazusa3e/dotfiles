@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 
 ; caps to toggle ime
-CapsLock::Send "#{Space}"
+CapsLock::Send "^#{Space}"
 
 ; remap shift + esc as tilde
 +Escape::Send "~"
