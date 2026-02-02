@@ -1,5 +1,5 @@
 git:
-  paging:
+  pagers:
     useConfig: true
   branchLogCmd: "git log --color --graph --pretty=format:'%Cred%h%Creset - %s%C(yellow)%d%Creset %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit {{branchName}} --"
   parseEmoji: true
