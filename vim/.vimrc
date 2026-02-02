@@ -16,7 +16,7 @@ set autoread
 set updatetime=500
 set scrolloff=5
 let mapleader=' '
-set mouse=
+" set mouse=
 autocmd FileType * set formatoptions-=cro
 set signcolumn=number
 set sessionoptions+=tabpages,globals
