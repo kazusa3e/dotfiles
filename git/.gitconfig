@@ -21,7 +21,8 @@
 
 [pull]
 	ff = only
-	rebase = true
+    rebase = true
+    autostash = true
 
 [color]
 	ui = auto

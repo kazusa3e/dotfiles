@@ -1,7 +1,12 @@
 .DS_Store
+
 cmd.mk
+.local/
+.vscode/
+
+.claude
+CLAUDE.md
 
 .clangd
 .cache/
-.vscode/
 compile_commands.json
