@@ -2,7 +2,7 @@
 
 Checks: "*,
   -llvm*,
-  -fuchasia*,
+  -fuchsia*,
   -altera*,
   -boost*,
   -readability-magic-numbers,
