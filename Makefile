@@ -5,10 +5,7 @@ ifeq ($(os),Linux)
 	is_wsl = $(shell uname -a | grep -q 'WSL' && echo yes || echo no)
 endif
 
-# TODO: git global ignore files
-app := zsh vim tmux starship git clang lazygit alacritty
-
-# TODO: scoop app lists
+app := zsh vim tmux starship git clangd lazygit alacritty
 
 ifeq ($(os),Darwin)
 	app += karabiner idea hammerspoon brew

@@ -1,0 +1,11 @@
+Diagnostics:
+  ClangTidy:
+    FastCheckFilter: None
+  MissingIncludes: Strict
+Completion:
+  ArgumentLists: Delimiters
+InlayHints:
+  BlockEnd: true
+  DefaultArguments: true
+Hover:
+  ShowAKA: true
