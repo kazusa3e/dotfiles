@@ -2,6 +2,7 @@ Diagnostics:
   ClangTidy:
     FastCheckFilter: None
   MissingIncludes: Strict
+  UnusedIncludes: Strict
 Completion:
   ArgumentLists: Delimiters
 InlayHints:

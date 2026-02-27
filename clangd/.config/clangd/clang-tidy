@@ -1,5 +1,4 @@
 ---
-
 Checks: "*,
   -llvm*,
   -fuchsia*,
@@ -8,7 +7,16 @@ Checks: "*,
   -readability-magic-numbers,
   -readability-identifier-length,
   -readability-container-data-pointer,
-  -cppcoreguidelines-avoid-magic-numbers"
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -portability-avoid-pragma-once,
+  -readability-braces-around-statements,
+  -hicpp-braces-around-statements"
+
+CheckOptions:
+  bugprone-exception-escape.IgnoredExceptions: 'std::format_error'
+  # bugprone-exception-escape.CheckMain: 'false'
+  readability-identifier-naming.DefaultCase: 'lower_case'
 
 HeaderFilterRegex: '^(?!.*/build/)(?!.*/\.cache/)(?!.*/_deps/).*(src|include|tests)/.*'
 SystemHeaders: false

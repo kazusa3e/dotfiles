@@ -13,3 +13,5 @@ BraceWrapping:
   AfterFunction: true
   AfterControlStatement: true
   BeforeElse: true
+PointerAlignment: Right
+SpaceBeforeCpp11BracedList: true
