@@ -23,7 +23,6 @@ fi
 eval "$(starship init zsh)"
 
 # theme
-# export LS_COLORS="$(vivid generate ayu)"
 if [[ -z "$USE_THEME" ]]; then
     export USE_THEME=dark
 fi
@@ -31,17 +30,6 @@ fi
 # local bin
 export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
-if [ $(uname -s) = "Darwin" ]; then
-    export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
-fi
-
-# scripts
-if [ -d $HOME/Code/scripts ]; then      # Darwin
-    export PATH="$HOME/Code/scripts/.bin:$PATH"
-fi
-if [ -d $HOME/scripts ]; then           # Linux
-    export PATH="$HOME/scripts/.bin:$PATH"
-fi
 
 # coreutils
 if [ $(uname -s) = "Darwin" ]; then
@@ -70,15 +58,6 @@ if [ $(uname -s) = "Linux" ]; then
     [ -f $HOME/.fzf/shell/completion.zsh ] && source $HOME/.fzf/shell/completion.zsh
     [ -f $HOME/.fzf/bin/fzf ] && export PATH="$HOME/.fzf/bin:$PATH"
 fi
-if [ "$USE_THEME" = "light" ]; then
-    export FZF_DEFAULT_OPTS=' 
-        --color=fg:#4b505b,bg:#fafafa,hl:#5079be 
-        --color=fg+:#4b505b,bg+:#fafafa,hl+:#3a8b84 
-        --color=info:#88909f,prompt:#d05858,pointer:#b05ccc 
-        --color=marker:#608e32,spinner:#d05858,header:#3a8b84'
-else
-    export FZF_DEFAULT_OPTS=''
-fi
 
 # aliases
 [ -f ~/.aliases ] && source ~/.aliases
@@ -96,9 +75,42 @@ export SAVEHIST=$HISTSIZE
 setopt HIST_IGNORE_ALL_DUPS     # overwrite older history when dups occur
 setopt INC_APPEND_HISTORY       # write history file immediately
 
-# fix lost of last line without line break
-unsetopt PROMPT_SP
-precmd() { print "" }
+# notify when a long-running command finishes
+function notify() {
+    local title="$1"
+    local message="${2:-$1}"
+
+    local seq="\e]777;notify;${title};${message}\a"
+
+    if [ -n "$TMUX" ]; then
+        local escaped_seq="${seq//\\e/\\e\\e}"
+        printf "\ePtmux;\e%b\e\\" "$escaped_seq"
+    else
+        printf "%b" "$seq"
+    fi
+}
+export NOTIFY_THRESHOLD=5
+
+function _notif_preexec() {
+    _notif_start_time=$SECONDS
+    _notif_last_command=$1
+}
+
+function _notif_precmd() {
+    if [[ -n $_notif_start_time ]]; then
+        local end_time=$SECONDS
+        local elapsed=$(( end_time - _notif_start_time ))
+
+        if (( elapsed >= NOTIFY_THRESHOLD )); then
+            notify "Task Completed in ${elapsed}s" "Command: $_notif_last_command"
+        fi
+        unset _notif_start_time
+    fi
+}
+
+autoload -Uz add-zsh-hook
+add-zsh-hook preexec _notif_preexec
+add-zsh-hook precmd _notif_precmd
 
 # rustup
 if [ $(uname -s) = "Darwin" ]; then
