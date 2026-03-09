@@ -10,14 +10,14 @@ CapsLock::Send "^#{Space}"
 RShift::Send "{WheelUp}"
 RCtrl::Send "{WheelDown}"
 
-; use alt + q to toggle alacritty terminal
+; use alt + q to toggle wezterm terminal
 !q:: {
-    AlacrittyPath := "C:\Users\kazusa\scoop\apps\alacritty\current\alacritty.exe"
+    WezTermPath := "C:\Program Files\WezTerm\wezterm-gui.exe"
 
-    AlacrittyClass := "ahk_class Window Class"
-    AlacrittyExe := "ahk_exe alacritty.exe"
+    WezTermClass := "ahk_class org.wezfurlong.wezterm"
+    WezTermExe := "ahk_exe wezterm-gui.exe"
 
-    WinToTarget := AlacrittyClass " " AlacrittyExe
+    WinToTarget := WezTermClass " " WezTermExe
 
     if WinExist(WinToTarget) {
         if WinActive(WinToTarget) {
@@ -26,6 +26,6 @@ RCtrl::Send "{WheelDown}"
             WinActivate(WinToTarget)
         }
     } else {
-        Run AlacrittyPath
+        Run WezTermPath
     }
 }
