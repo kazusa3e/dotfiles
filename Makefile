@@ -8,7 +8,7 @@ endif
 app := zsh vim tmux starship git clangd lazygit alacritty
 
 ifeq ($(os),Darwin)
-	app += karabiner idea hammerspoon brew
+	app += karabiner idea hammerspoon brew wezterm
 endif
 
 windows_user := 
