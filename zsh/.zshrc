@@ -89,7 +89,7 @@ function notify() {
         printf "%b" "$seq"
     fi
 }
-export NOTIFY_THRESHOLD=5
+export NOTIFY_THRESHOLD=60
 
 function _notif_preexec() {
     _notif_start_time=$SECONDS
