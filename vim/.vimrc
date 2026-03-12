@@ -26,12 +26,14 @@ set exrc
 " }}}
 
 " indent {{{
-set tabstop=4
-set shiftwidth=0
 set expandtab
 set autoindent
 set smartindent
+
+set tabstop=4
+set shiftwidth=0
 set textwidth=0
+set softtabstop=-1
 set wrap
 " }}}
 
