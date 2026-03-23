@@ -28,6 +28,7 @@ config.initial_cols = 120
 config.initial_rows = 30
 
 config.color_scheme = 'Edge Dark (base16)'
+config.cursor_blink_rate = 0
 
 config.font = wezterm.font_with_fallback {
     'Maple Mono NF CN',
