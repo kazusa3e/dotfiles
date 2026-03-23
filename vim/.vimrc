@@ -92,20 +92,20 @@ set foldmethod=expr
 nnoremap s <nop>
 nnoremap S <nop>
 nnoremap a <nop>
-nnoremap m <nop>
-nnoremap M <nop>
+" nnoremap m <nop>
+" nnoremap M <nop>
 nnoremap q <nop>
 nnoremap Q <nop>
 xnoremap q <nop>
 xnoremap Q <nop>
-nnoremap m q
-nnoremap M Q
+" nnoremap m q
+" nnoremap M Q
 xnoremap s <nop>
 xnoremap S <nop>
 nnoremap <F1> <nop>
-nnoremap t <nop>
-nnoremap T <nop>
-nnoremap t m
+" nnoremap t <nop>
+" nnoremap T <nop>
+" nnoremap t m
 " }}}
 
 " buffer {{{
