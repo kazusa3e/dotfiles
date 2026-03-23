@@ -77,4 +77,5 @@ alias bat="bat -p $*"
 
 alias mk="make -f cmd.mk $*"
 
+alias todo='f() { echo "- [ ] $*" >> ~/wiki/Inbox.md }; f'
 # vim: ft=zsh
