@@ -96,13 +96,26 @@ function _notif_preexec() {
     _notif_last_command=$1
 }
 
+function _format_duration() {
+    local total=$1
+    local h=$((total / 3600))
+    local m=$(((total % 3600) / 60))
+    local s=$((total % 60))
+    local res=""
+    [[ $h -gt 0 ]] && res+="${h}h"
+    [[ $m -gt 0 ]] && res+="${m}m"
+    [[ $s -gt 0 ]] && res+="${s}s"
+    [[ -z $res ]] && res="0s"
+    echo "$res"
+}
+
 function _notif_precmd() {
     if [[ -n $_notif_start_time ]]; then
         local end_time=$SECONDS
         local elapsed=$(( end_time - _notif_start_time ))
-
         if (( elapsed >= NOTIFY_THRESHOLD )); then
-            notify "Task Completed in ${elapsed}s" "Command: $_notif_last_command"
+            local duration=$(_format_duration $elapsed)
+            notify "Task Completed in ${duration}" "Command: $_notif_last_command"
         fi
         unset _notif_start_time
     fi
