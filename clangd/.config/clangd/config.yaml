@@ -6,7 +6,12 @@ Diagnostics:
 Completion:
   ArgumentLists: Delimiters
 InlayHints:
+  Enabled: true
   BlockEnd: true
+  Designators: true
+  ParameterNames: true
+  DeducedTypes: true
   DefaultArguments: true
+  TypeNameLimit: 24
 Hover:
   ShowAKA: true
