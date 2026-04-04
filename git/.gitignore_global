@@ -4,9 +4,6 @@ cmd.mk
 .local/
 .vscode/
 
-.claude
-CLAUDE.md
-
 .clangd
 .cache/
 compile_commands.json
