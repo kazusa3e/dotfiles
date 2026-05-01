@@ -131,6 +131,9 @@ if [ $(uname -s) = "Darwin" ]; then
 fi
 export PATH="$HOME/.cargo/bin:$PATH"
 
+# npm
+export PATH="$HOME/.local/share/npm-global/bin:$PATH"
+
 # man pager
 export MANPAGER='nvim +Man!'
 
