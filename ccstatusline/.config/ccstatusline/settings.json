@@ -1,0 +1,110 @@
+{
+  "version": 3,
+  "lines": [
+    [
+      {
+        "id": "1",
+        "type": "model",
+        "color": "cyan"
+      },
+      {
+        "id": "2",
+        "type": "separator"
+      },
+      {
+        "id": "f2d99697-6540-48bf-b99f-e7c8b84d0cd3",
+        "type": "git-branch"
+      },
+      {
+        "id": "d9f95089-838c-45e9-a953-047641567981",
+        "type": "separator"
+      },
+      {
+        "id": "0b930c5e-174c-4f39-8b77-81817559fcc0",
+        "type": "git-changes"
+      },
+      {
+        "id": "31f7d43e-9d9b-4311-baa0-b9d8daaea549",
+        "type": "separator"
+      },
+      {
+        "id": "78d47fc4-944f-4ff8-9399-e9d95aad7ce4",
+        "type": "output-style"
+      },
+      {
+        "id": "f31b74bc-c9a4-4e19-a930-0de3ce3cfa8f",
+        "type": "separator"
+      },
+      {
+        "id": "d445d68b-ed85-4c14-aa8b-dd7fb582404f",
+        "type": "thinking-effort"
+      },
+      {
+        "id": "0a1d42e2-68d8-46ca-b75b-b1f595c1abac",
+        "type": "separator"
+      },
+      {
+        "id": "2ef71ce5-f451-41a6-9358-7f164337d750",
+        "type": "skills"
+      }
+    ],
+    [
+      {
+        "id": "b0470c08-5c40-43a7-aa37-2e38c200eeb6",
+        "type": "context-bar"
+      },
+      {
+        "id": "89ad9f1c-42b5-42b4-b9ee-5ac46f3b7c9a",
+        "type": "separator"
+      },
+      {
+        "id": "a2332599-ba00-4877-9cc1-ca05a20576bf",
+        "type": "tokens-input"
+      },
+      {
+        "id": "d1b793e5-fb3d-4104-abe0-a929f3e782e6",
+        "type": "separator"
+      },
+      {
+        "id": "ab6d57ec-e371-40fa-9358-8b2aa22d1589",
+        "type": "tokens-output"
+      },
+      {
+        "id": "97f48d83-6273-4e01-a912-da09c12a7278",
+        "type": "separator"
+      },
+      {
+        "id": "f8bc46c6-e873-4c36-9baf-6916a09f50d6",
+        "type": "tokens-cached"
+      },
+      {
+        "id": "7bd54855-6f88-4f20-b3a2-37d3442b4e37",
+        "type": "separator"
+      },
+      {
+        "id": "5d0e05f1-d609-4495-bbdc-5ea0154fbde8",
+        "type": "output-speed"
+      }
+    ],
+    []
+  ],
+  "flexMode": "full-minus-40",
+  "compactThreshold": 60,
+  "colorLevel": 2,
+  "inheritSeparatorColors": false,
+  "globalBold": false,
+  "minimalistMode": false,
+  "powerline": {
+    "enabled": false,
+    "separators": [
+      ""
+    ],
+    "separatorInvertBackground": [
+      false
+    ],
+    "startCaps": [],
+    "endCaps": [],
+    "autoAlign": false,
+    "continueThemeAcrossLines": false
+  }
+}
