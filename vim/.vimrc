@@ -16,7 +16,7 @@ set autoread
 set updatetime=500
 set scrolloff=5
 let mapleader=' '
-" set mouse=
+set mouse=a
 autocmd FileType * set formatoptions-=cro
 set signcolumn=number
 set sessionoptions+=tabpages,globals
@@ -48,35 +48,6 @@ nnoremap <c-n> <cmd>nohlsearch<cr>
 " fold {{{
 set foldlevel=99
 set foldcolumn=0
-function! NextNonBlankLine(lnum)
-    let numlines = line('$')
-    let current = a:lnum + 1
-    while current <= numlines
-        if getline(current) =~? '\v\S'
-            return current
-        endif
-        let current += 1
-    endwhile
-    return -2
-endfunction
-function! IndentLevel(lnum)
-    return indent(a:lnum) / &shiftwidth
-endfunction
-function! GetPotionFold(lnum)
-    if getline(a:lnum) =~? '\v^\s*$'
-        return '-1'
-    endif
-    let this_indent = IndentLevel(a:lnum)
-    let next_indent = IndentLevel(NextNonBlankLine(a:lnum))
-    if next_indent == this_indent
-        return this_indent
-    elseif next_indent < this_indent
-        return this_indent
-    elseif next_indent > this_indent
-        return '>' . next_indent
-    endif
-endfunction
-set foldexpr=GetPotionFold(v:lnum)
 set foldmethod=expr
 " }}}
 
