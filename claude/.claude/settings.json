@@ -3,10 +3,11 @@
   "permissions": {
     "defaultMode": "plan",
     "allow": [
-      "WebSearch"
-    ],
-    "ask": [
-      "Bash"
+      "WebSearch",
+      "Read",
+      "Bash(grep *)",
+      "Bash(git log *)",
+      "Bash(git diff *)"
     ]
   },
   "effortLevel": "max",
