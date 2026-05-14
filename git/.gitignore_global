@@ -7,3 +7,5 @@ cmd.mk
 .clangd
 .cache/
 compile_commands.json
+
+.claude/

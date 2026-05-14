@@ -76,19 +76,6 @@ setopt HIST_IGNORE_ALL_DUPS     # overwrite older history when dups occur
 setopt INC_APPEND_HISTORY       # write history file immediately
 
 # notify when a long-running command finishes
-function notify() {
-    local title="$1"
-    local message="${2:-$1}"
-
-    local seq="\e]777;notify;${title};${message}\a"
-
-    if [ -n "$TMUX" ]; then
-        local escaped_seq="${seq//\\e/\\e\\e}"
-        printf "\ePtmux;\e%b\e\\" "$escaped_seq"
-    else
-        printf "%b" "$seq"
-    fi
-}
 export NOTIFY_THRESHOLD=60
 
 function _notif_preexec() {
@@ -115,7 +102,7 @@ function _notif_precmd() {
         local elapsed=$(( end_time - _notif_start_time ))
         if (( elapsed >= NOTIFY_THRESHOLD )); then
             local duration=$(_format_duration $elapsed)
-            notify "Task Completed in ${duration}" "Command: $_notif_last_command"
+            qnotify "Task Completed in ${duration}" "Command: $_notif_last_command"
         fi
         unset _notif_start_time
     fi

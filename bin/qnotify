@@ -1,0 +1,35 @@
+#!/usr/bin/env zsh
+
+title="$1"
+message="${2:-$1}"
+
+# Collect all user-owned writable PTS devices
+pts_list=()
+for pts in /dev/pts/*; do
+    if [ -w "$pts" ] && [ "$(stat -c %U "$pts" 2>/dev/null)" = "$USER" ]; then
+        pts_list+=("$pts")
+    fi
+done
+
+if [ ${#pts_list[@]} -eq 0 ]; then
+    exit 0
+fi
+
+# Pick the most recently accessed PTS for OSC notification
+newest=${pts_list[1]}
+newest_atime=$(stat -c %X "$newest" 2>/dev/null)
+for pts in "${pts_list[@]:1}"; do
+    atime=$(stat -c %X "$pts" 2>/dev/null)
+    if [ "$atime" -gt "$newest_atime" ]; then
+        newest=$pts
+        newest_atime=$atime
+    fi
+done
+
+for pts in "${pts_list[@]}"; do
+    if [ "$pts" = "$newest" ]; then
+        tnotify -t "$title" "$message" > "$pts"
+    else
+        echo "[$title] $message" > "$pts"
+    fi
+done

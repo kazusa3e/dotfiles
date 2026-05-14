@@ -3,3 +3,4 @@
 !.gitignore
 !mcp.json
 !Makefile
+!notify.sh

@@ -28,6 +28,8 @@ install:
 	if [ "$(os)" = "Darwin" ]; then \
 		goku; \
 	fi
+	fd . bin/ -0 | xargs -I{} --null sh -c 'ln -s "$$(pwd)/{}" "$$HOME/.local/bin/$$(basename {})"'
+	
 
 .PHONY: uninstall
 uninstall:
@@ -36,3 +38,4 @@ uninstall:
 	# if [ "$(is_wsl)" = "yes" ]; then \
 	# 	rm "/mnt/c/Users/$(windows_user)/Documents/AutoHotkey/keybindings.ahk"; \
 	# fi
+	-fd . bin/ -0 | xargs -I{} --null sh -c 'rm "$$HOME/.local/bin/$$(basename {})"'
