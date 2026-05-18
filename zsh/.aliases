@@ -79,24 +79,24 @@ alias mk="make -f cmd.mk $*"
 
 alias todo='f() { echo "- [ ] $*" >> ~/wiki/Inbox.md }; f'
 
-function cc() {
-
-    local base_url="${CC_USE}_ANTHROPIC_BASE_URL"
-    local auth_token="${CC_USE}_ANTHROPIC_AUTH_TOKEN"
-    local model="${CC_USE}_ANTHROPIC_MODEL"
-    local default_opus_model="${CC_USE}_ANTHROPIC_DEFAULT_OPUS_MODEL"
-    local default_sonnet_model="${CC_USE}_ANTHROPIC_DEFAULT_SONNET_MODEL"
-    local default_haiku_model="${CC_USE}_ANTHROPIC_DEFAULT_HAIKU_MODEL"
-
-    # CLAUDE_CODE_EFFORT_LEVEL="max" \
-    ANTHROPIC_BASE_URL="${(P)base_url}" \
-        ANTHROPIC_AUTH_TOKEN="${(P)auth_token}" \
-        ANTHROPIC_MODEL="${(P)model}" \
-        ANTHROPIC_DEFAULT_OPUS_MODEL="${(P)default_opus_model}" \
-        ANTHROPIC_DEFAULT_SONNET_MODEL="${(P)default_sonnet_model}" \
-        ANTHROPIC_DEFAULT_HAIKU_MODEL="${(P)default_haiku_model}" \
-        TAVILY_API_KEY="${TAVILY_API_KEY}" \
-        claude "$@"
-}
+# function cc() {
+#
+#     local base_url="${CC_USE}_ANTHROPIC_BASE_URL"
+#     local auth_token="${CC_USE}_ANTHROPIC_AUTH_TOKEN"
+#     local model="${CC_USE}_ANTHROPIC_MODEL"
+#     local default_opus_model="${CC_USE}_ANTHROPIC_DEFAULT_OPUS_MODEL"
+#     local default_sonnet_model="${CC_USE}_ANTHROPIC_DEFAULT_SONNET_MODEL"
+#     local default_haiku_model="${CC_USE}_ANTHROPIC_DEFAULT_HAIKU_MODEL"
+#
+#     # CLAUDE_CODE_EFFORT_LEVEL="max" \
+#     ANTHROPIC_BASE_URL="${(P)base_url}" \
+#         ANTHROPIC_AUTH_TOKEN="${(P)auth_token}" \
+#         ANTHROPIC_MODEL="${(P)model}" \
+#         ANTHROPIC_DEFAULT_OPUS_MODEL="${(P)default_opus_model}" \
+#         ANTHROPIC_DEFAULT_SONNET_MODEL="${(P)default_sonnet_model}" \
+#         ANTHROPIC_DEFAULT_HAIKU_MODEL="${(P)default_haiku_model}" \
+#         TAVILY_API_KEY="${TAVILY_API_KEY}" \
+#         claude "$@"
+# }
 
 # vim: ft=zsh

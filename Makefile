@@ -11,7 +11,7 @@ ifeq ($(os),Darwin)
 	app += karabiner idea hammerspoon brew wezterm
 endif
 
-# windows_user := 
+# windows_user :=
 # ifeq ($(is_wsl),yes)
 # 	windows_user := $(shell powershell.exe -NoProfile -NonInteractive -Command "\$$Env:UserName" | sed 's/\r//g')
 # endif
@@ -28,8 +28,8 @@ install:
 	if [ "$(os)" = "Darwin" ]; then \
 		goku; \
 	fi
-	fd . bin/ -0 | xargs -I{} --null sh -c 'ln -s "$$(pwd)/{}" "$$HOME/.local/bin/$$(basename {})"'
-	
+	-fd . bin/ -0 | xargs -I{} --null sh -c 'ln -s "$$(pwd)/{}" "$$HOME/.local/bin/$$(basename {})"'
+
 
 .PHONY: uninstall
 uninstall:

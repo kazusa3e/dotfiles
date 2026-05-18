@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+
+import json
+import profile
+from typing import Optional, List
+from dataclasses import dataclass
+import os
+import subprocess
+import sys
+
+CONFIG_FILE = os.path.expanduser('~/.cc.json')
+
+@dataclass
+class Provider:
+    abbr: str
+    base_url: str
+    auth_token: str
+    name: Optional[str] = None
+    is_default: Optional[bool] = None
+    model: Optional[str] = None
+    opus_model: Optional[str] = None
+    sonnet_model: Optional[str] = None
+    haiku_model: Optional[str] = None
+    subagent_model: Optional[str] = None
+
+@dataclass
+class Config:
+    providers: List[Provider]
+
+
+def load_config() -> Config:
+    with open(CONFIG_FILE, 'r') as f:
+        data = json.load(f)
+    providers = [Provider(**p) for p in data['providers']]
+    return Config(providers=providers)
+
+def compose_env(provider: Provider) -> dict:
+    env = os.environ.copy()
+    env['ANTHROPIC_BASE_URL'] = provider.base_url
+    env['ANTHROPIC_AUTH_TOKEN'] = provider.auth_token
+    if provider.model:
+        env['ANTHROPIC_MODEL'] = provider.model
+    if provider.opus_model:
+        env['ANTHROPIC_DEFAULT_OPUS_MODEL'] = provider.opus_model
+    if provider.sonnet_model:
+        env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = provider.sonnet_model
+    if provider.haiku_model:
+        env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = provider.haiku_model
+    if provider.subagent_model:
+        env['SUBAGENT_MODEL'] = provider.subagent_model
+    return env
+
+def invoke_cc(profile: Optional[str], args: List[str]) -> None:
+    config = load_config()
+    if profile is None:
+        provider = next((p for p in config.providers if p.is_default), None)
+    else:
+        provider = next((p for p in config.providers if p.abbr == profile), None)
+
+    if provider is None:
+        print(f"Error: No provider found for profile '{profile}'")
+        return
+
+    # print(f"Invoking provider: {provider.name or provider.abbr}")
+    env = compose_env(provider)
+    subprocess.run(['claude', *args], env=env)
+
+def main() -> None:
+    profile = os.getenv('CC_USE', None)
+
+    args = sys.argv[1:]
+
+    invoke_cc(profile, args)
+
+if __name__ == '__main__':
+    main()

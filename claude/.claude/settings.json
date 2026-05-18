@@ -9,7 +9,8 @@
       "WebSearch",
       "WebFetch",
       "mcp__tavily__tavily_search",
-      "mcp__tavily__tavily_fetch"
+      "mcp__tavily__tavily_fetch",
+      "mcp__tavily__tavily_extract"
     ],
     "deny": [],
     "defaultMode": "plan"
