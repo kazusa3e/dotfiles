@@ -30,6 +30,6 @@ for pts in "${pts_list[@]}"; do
     if [ "$pts" = "$newest" ]; then
         tnotify -t "$title" "$message" > "$pts"
     else
-        echo "[$title] $message" > "$pts"
+        # echo "[$title] $message" > "$pts"
     fi
 done
