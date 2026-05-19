@@ -26,15 +26,17 @@ class Provider:
 @dataclass
 class Config:
     providers: List[Provider]
+    env: Optional[dict] = None
 
 
 def load_config() -> Config:
     with open(CONFIG_FILE, 'r') as f:
         data = json.load(f)
     providers = [Provider(**p) for p in data['providers']]
-    return Config(providers=providers)
+    env = data.get('env', None)
+    return Config(providers=providers, env=env)
 
-def compose_env(provider: Provider) -> dict:
+def compose_env(provider: Provider, config: Config) -> dict:
     env = os.environ.copy()
     env['ANTHROPIC_BASE_URL'] = provider.base_url
     env['ANTHROPIC_AUTH_TOKEN'] = provider.auth_token
@@ -48,6 +50,10 @@ def compose_env(provider: Provider) -> dict:
         env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = provider.haiku_model
     if provider.subagent_model:
         env['SUBAGENT_MODEL'] = provider.subagent_model
+
+    if config.env:
+        env.update(config.env)
+
     return env
 
 def invoke_cc(profile: Optional[str], args: List[str]) -> None:
@@ -62,7 +68,7 @@ def invoke_cc(profile: Optional[str], args: List[str]) -> None:
         return
 
     # print(f"Invoking provider: {provider.name or provider.abbr}")
-    env = compose_env(provider)
+    env = compose_env(provider, config)
     subprocess.run(['claude', *args], env=env)
 
 def main() -> None:
