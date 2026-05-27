@@ -99,4 +99,6 @@ alias todo='f() { echo "- [ ] $*" >> ~/wiki/Inbox.md }; f'
 #         claude "$@"
 # }
 
+alias oc="opencode $*"
+
 # vim: ft=zsh

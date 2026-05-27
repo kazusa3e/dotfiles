@@ -5,7 +5,7 @@ os := $(shell uname -s)
 # 	is_wsl = $(shell uname -a | grep -q 'WSL' && echo yes || echo no)
 # endif
 
-app := zsh vim tmux starship git clangd lazygit alacritty yazi npm claude ccstatusline
+app := zsh vim tmux starship git clangd lazygit alacritty yazi npm claude ccstatusline opencode
 
 ifeq ($(os),Darwin)
 	app += karabiner idea hammerspoon brew wezterm

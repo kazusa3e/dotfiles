@@ -21,6 +21,10 @@
       "mcp__tavily__tavily_research",
       "mcp__tavily__tavily_crawl"
     ],
+    "ask": [
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
     "deny": [],
     "defaultMode": "plan"
   },
