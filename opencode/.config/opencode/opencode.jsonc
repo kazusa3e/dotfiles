@@ -20,7 +20,13 @@
         "webfetch": "allow",
         "websearch": "allow",
         "skill": "allow",
-        "lsp": "allow"
+        "lsp": "allow",
+        "tavily_tavily_search": "allow",
+        "tavily_tavily_research": "allow",
+        "tavily_tavily_fetch": "allow",
+        "tavily_tavily_extract": "allow",
+        "tavily_tavily_map": "allow",
+        "tavily_tavily_crawl": "allow"
     },
     "mcp": {
         "tavily": {

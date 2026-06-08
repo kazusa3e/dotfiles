@@ -9,7 +9,6 @@
   "permissions": {
     "allow": [
       "Read(./**)",
-      "Bash(grep *)",
       "Bash(git log *)",
       "Bash(git diff *)",
       "WebSearch",

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 import json
-import profile
 from typing import Optional, List
 from dataclasses import dataclass
 import os
+import re
 import subprocess
 import sys
 
@@ -36,10 +36,33 @@ def load_config() -> Config:
     env = data.get('env', None)
     return Config(providers=providers, env=env)
 
+def _resolve_vars(value: str, config_env: Optional[dict]) -> str:
+    """Resolve $VAR and ${VAR} references in `value`.
+
+    Lookup order:
+      1. `config_env` (the "env" section of ~/.cc.json)
+      2. `os.environ` (the actual OS environment)
+    Unresolved references are left as-is (no error raised).
+    """
+    if not config_env:
+        config_env = {}
+
+    def _replacer(match: re.Match) -> str:
+        name = match.group(1) or match.group(2)
+        if name in config_env:
+            return config_env[name]
+        if name in os.environ:
+            return os.environ[name]
+        # Leave unresolved references intact
+        return match.group(0)
+
+    return re.sub(r'\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)', _replacer, value)
+
+
 def compose_env(provider: Provider, config: Config) -> dict:
     env = os.environ.copy()
-    env['ANTHROPIC_BASE_URL'] = provider.base_url
-    env['ANTHROPIC_AUTH_TOKEN'] = provider.auth_token
+    env['ANTHROPIC_BASE_URL'] = _resolve_vars(provider.base_url, config.env)
+    env['ANTHROPIC_AUTH_TOKEN'] = _resolve_vars(provider.auth_token, config.env)
     if provider.model:
         env['ANTHROPIC_MODEL'] = provider.model
     if provider.opus_model:
