@@ -167,6 +167,9 @@ endif
 " }}}
 
 " colorscheme {{{
+if has('termguicolors')
+    set termguicolors
+endif
 let s:use_theme = getenv('USE_THEME')
 if s:use_theme == "light"
     set background=light
