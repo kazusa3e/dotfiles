@@ -295,8 +295,10 @@ def _is_detached_head(repo_path: Path) -> bool:
 
 
 def _do_fetch(repo_path: Path) -> None:
-    """Fetch the current branch's upstream remote. Falls back to origin."""
+    """Fetch the current branch's upstream remote, or the first available remote."""
     remote = _get_upstream_remote(repo_path)
+    if remote is None:
+        return  # No remotes configured, nothing to fetch
     try:
         r = subprocess.run(
             ["git", "fetch", remote],
@@ -311,8 +313,11 @@ def _do_fetch(repo_path: Path) -> None:
         print(f"warning: fetch error for {repo_path}: {e}", file=sys.stderr)
 
 
-def _get_upstream_remote(repo_path: Path) -> str:
-    """Get the remote name for the current branch's upstream."""
+def _get_upstream_remote(repo_path: Path) -> Optional[str]:
+    """Get the remote name for the current branch's upstream.
+
+    Falls back to the first available remote. Returns None if no remotes exist.
+    """
     try:
         r = subprocess.run(
             ["git", "for-each-ref", "--format=%(upstream:remotename)", "refs/heads/HEAD"],
@@ -323,7 +328,20 @@ def _get_upstream_remote(repo_path: Path) -> str:
             return remote
     except (OSError, subprocess.SubprocessError):
         pass
-    return "origin"
+
+    # Fallback: try to get the first available remote
+    try:
+        r = subprocess.run(
+            ["git", "remote"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        remotes = [line.strip() for line in r.stdout.strip().splitlines() if line.strip()]
+        if remotes:
+            return remotes[0]
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    return None
 
 
 # --- Output formatting ---
