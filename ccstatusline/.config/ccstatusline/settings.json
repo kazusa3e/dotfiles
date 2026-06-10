@@ -37,7 +37,8 @@
       },
       {
         "id": "d445d68b-ed85-4c14-aa8b-dd7fb582404f",
-        "type": "thinking-effort"
+        "type": "thinking-effort",
+        "color": "magenta"
       },
       {
         "id": "0a1d42e2-68d8-46ca-b75b-b1f595c1abac",
@@ -45,7 +46,8 @@
       },
       {
         "id": "2ef71ce5-f451-41a6-9358-7f164337d750",
-        "type": "skills"
+        "type": "skills",
+        "color": "brightBlue"
       }
     ],
     [
@@ -59,7 +61,8 @@
       },
       {
         "id": "a2332599-ba00-4877-9cc1-ca05a20576bf",
-        "type": "tokens-input"
+        "type": "tokens-input",
+        "color": "magenta"
       },
       {
         "id": "d1b793e5-fb3d-4104-abe0-a929f3e782e6",
@@ -67,7 +70,8 @@
       },
       {
         "id": "ab6d57ec-e371-40fa-9358-8b2aa22d1589",
-        "type": "tokens-output"
+        "type": "tokens-output",
+        "color": "magenta"
       },
       {
         "id": "97f48d83-6273-4e01-a912-da09c12a7278",
@@ -75,7 +79,8 @@
       },
       {
         "id": "f8bc46c6-e873-4c36-9baf-6916a09f50d6",
-        "type": "tokens-cached"
+        "type": "tokens-cached",
+        "color": "brightBlack"
       },
       {
         "id": "7bd54855-6f88-4f20-b3a2-37d3442b4e37",
@@ -84,6 +89,10 @@
       {
         "id": "5d0e05f1-d609-4495-bbdc-5ea0154fbde8",
         "type": "output-speed"
+      },
+      {
+        "id": "2c494846-34ee-41f2-bf2d-172c7c78e83b",
+        "type": "separator"
       }
     ],
     []
@@ -91,9 +100,10 @@
   "flexMode": "full-minus-40",
   "compactThreshold": 60,
   "colorLevel": 2,
-  "inheritSeparatorColors": false,
-  "globalBold": false,
-  "minimalistMode": false,
+  "inheritSeparatorColors": true,
+  "globalBold": true,
+  "gitCacheTtlSeconds": 5,
+  "minimalistMode": true,
   "powerline": {
     "enabled": false,
     "separators": [

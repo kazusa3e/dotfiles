@@ -1,0 +1,549 @@
+#!/usr/bin/env python3
+
+"""repostatus - Check git repository status for multiple paths/patterns.
+
+Usage:
+    repostatus [paths...] [--depth N] [--fetch] [--no-color] [--no-sort]
+
+Examples:
+    repostatus ~/Work/hosted
+    repostatus ~/Work/*
+    repostatus . --depth 2 --fetch
+"""
+
+import argparse
+import concurrent.futures
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+
+@dataclass
+class RepoStatus:
+    """Status information for a single git repository."""
+    path: Path
+    branch: str
+    dirty_unstaged: bool
+    dirty_staged: bool
+    has_upstream: bool
+    ahead: int
+    behind: int
+    error: Optional[str] = None
+
+
+# --- Colors ---
+
+class Colors:
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RESET = "\033[0m"
+
+
+def should_use_color(no_color: bool) -> bool:
+    if no_color:
+        return False
+    return sys.stdout.isatty()
+
+
+def _c(text: str, color: str, use_color: bool) -> str:
+    if not use_color:
+        return text
+    return f"{color}{text}{Colors.RESET}"
+
+
+def _pad(text: str, width: int, align: str, color: Optional[str], use_color: bool) -> str:
+    """Pad text to a display width, optionally coloring the padded result.
+
+    Pad first (on plain text), then wrap with ANSI codes so the display
+    width is correct in terminals.
+    """
+    if align == "left":
+        padded = text.ljust(width)
+    elif align == "center":
+        padded = text.center(width)
+    else:
+        padded = text.rjust(width)
+    if color and use_color:
+        return f"{color}{padded}{Colors.RESET}"
+    return padded
+
+
+# --- Path resolution ---
+
+def expand_path(p: str) -> Path:
+    """Expand tilde and resolve a path string to a Path object."""
+    return Path(p).expanduser()
+
+
+def is_glob_pattern(arg: str) -> bool:
+    """Return True if arg contains glob metacharacters."""
+    return any(c in arg for c in "*?[")
+
+
+def resolve_paths(args: list[str]) -> list[Path]:
+    """Expand all input args into a deduplicated, sorted list of directory Paths.
+
+    - Plain dirs that exist → add directly
+    - Glob patterns → expand via Path.glob(), collect matched directories
+    - Non-existent plain paths → skip silently
+    """
+    seen: dict[Path, None] = {}
+
+    for arg in args:
+        expanded = expand_path(arg)
+        if is_glob_pattern(arg):
+            parent = expanded.parent.resolve()
+            pattern = expanded.name
+            if not parent.is_dir():
+                print(f"warning: glob parent does not exist: {arg}", file=sys.stderr)
+                continue
+            matched = sorted(parent.glob(pattern))
+            for m in matched:
+                if m.is_dir():
+                    seen[m.resolve()] = None
+        else:
+            if expanded.is_dir():
+                seen[expanded.resolve()] = None
+            # Silently skip non-directories (common with shell-expanded globs)
+
+    return sorted(seen.keys())
+
+
+# --- Repo discovery ---
+
+def is_git_repo(path: Path) -> bool:
+    """Check if a directory is a git repository."""
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+        )
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+_SKIP_DIRS = {".git", ".venv", "node_modules", ".tox", "__pycache__", ".cargo", ".rustup"}
+
+
+def walk_for_repos(root: Path, max_depth: int) -> list[Path]:
+    """Recursively walk from root up to max_depth, collecting git repos.
+
+    When max_depth == 0, check root itself only.
+    When max_depth >= 1, check immediate children; recurse deeper accordingly.
+    """
+    repos: list[Path] = []
+
+    def _walk(current: Path, remaining: int) -> None:
+        if is_git_repo(current):
+            repos.append(current)
+            return
+        if remaining <= 0:
+            return
+        try:
+            entries = sorted(current.iterdir())
+        except PermissionError:
+            return
+        for entry in entries:
+            if entry.name in _SKIP_DIRS or entry.name.startswith("."):
+                continue
+            if entry.is_symlink():
+                target = entry.resolve(strict=False)
+                if not target.is_dir():
+                    continue
+                if is_git_repo(target):
+                    repos.append(target)
+                elif remaining > 1:
+                    _walk(target, remaining - 1)
+            elif entry.is_dir():
+                _walk(entry, remaining - 1)
+
+    _walk(root, max_depth)
+    return repos
+
+
+def find_git_repos(dirs: list[Path], depth: int) -> list[Path]:
+    """Given a list of directories, find all git repos within them.
+
+    If a directory IS a git repo itself, include it directly.
+    If NOT a git repo, recurse up to `depth` levels to find sub-repos.
+    """
+    seen: dict[Path, None] = {}
+
+    for d in dirs:
+        if is_git_repo(d):
+            seen[d] = None
+        else:
+            for repo in walk_for_repos(d, depth):
+                seen[repo] = None
+
+    return sorted(seen.keys())
+
+
+# --- Git inspection ---
+
+_FETCH_TIMEOUT = 30  # seconds per repo fetch
+
+
+def parse_dirty(porcelain: str) -> tuple[bool, bool]:
+    """Parse `git status --porcelain` output.
+
+    Returns (has_unstaged, has_staged).
+    - Both non-space chars in columns 1-2: staged change
+    - Space + non-space char: unstaged change
+    """
+    has_staged = False
+    has_unstaged = False
+    for line in porcelain.splitlines():
+        if len(line) < 3:
+            continue
+        xy = line[:2]
+        if xy[0] != " " and xy[0] != "?":
+            has_staged = True
+        if xy[1] != " ":
+            has_unstaged = True
+    return has_unstaged, has_staged
+
+
+def inspect_repo(repo_path: Path, do_fetch: bool = False) -> RepoStatus:
+    """Run git commands to gather status for a single repo."""
+    try:
+        # Branch name
+        r = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=repo_path, capture_output=True, text=True, check=True,
+        )
+        branch = r.stdout.strip()
+
+        # Detect detached HEAD: git rev-parse shows "HEAD" when detached
+        if branch == "HEAD":
+            if _is_detached_head(repo_path):
+                branch = "(HEAD detached)"
+
+        # Dirty check
+        r = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_path, capture_output=True, text=True, check=True,
+        )
+        has_unstaged, has_staged = parse_dirty(r.stdout)
+
+        # Optional fetch — only the upstream remote
+        if do_fetch:
+            _do_fetch(repo_path)
+
+        # Upstream tracking
+        r = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "@{upstream}"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            return RepoStatus(
+                path=repo_path, branch=branch,
+                dirty_unstaged=has_unstaged, dirty_staged=has_staged,
+                has_upstream=False, ahead=0, behind=0,
+            )
+
+        # Sync status: behind / ahead
+        r = subprocess.run(
+            ["git", "rev-list", "--left-right", "--count", "@{upstream}...HEAD"],
+            cwd=repo_path, capture_output=True, text=True, check=True,
+        )
+        parts = r.stdout.strip().split()
+        behind = int(parts[0]) if len(parts) > 0 else 0
+        ahead = int(parts[1]) if len(parts) > 1 else 0
+
+        return RepoStatus(
+            path=repo_path, branch=branch,
+            dirty_unstaged=has_unstaged, dirty_staged=has_staged,
+            has_upstream=True, ahead=ahead, behind=behind,
+        )
+    except subprocess.CalledProcessError as e:
+        return RepoStatus(
+            path=repo_path, branch="(error)",
+            dirty_unstaged=False, dirty_staged=False,
+            has_upstream=False, ahead=0, behind=0,
+            error=f"git command failed: {e.cmd}",
+        )
+    except Exception as e:
+        return RepoStatus(
+            path=repo_path, branch="(error)",
+            dirty_unstaged=False, dirty_staged=False,
+            has_upstream=False, ahead=0, behind=0,
+            error=str(e),
+        )
+
+
+def _is_detached_head(repo_path: Path) -> bool:
+    """Check if the repo is in detached HEAD state."""
+    try:
+        r = subprocess.run(
+            ["git", "symbolic-ref", "-q", "HEAD"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        return r.returncode != 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _do_fetch(repo_path: Path) -> None:
+    """Fetch the current branch's upstream remote. Falls back to origin."""
+    remote = _get_upstream_remote(repo_path)
+    try:
+        r = subprocess.run(
+            ["git", "fetch", remote],
+            cwd=repo_path, capture_output=True, text=True,
+            timeout=_FETCH_TIMEOUT,
+        )
+        if r.returncode != 0:
+            print(f"warning: fetch failed for {repo_path}: {r.stderr.strip()}", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print(f"warning: fetch timed out for {repo_path}", file=sys.stderr)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"warning: fetch error for {repo_path}: {e}", file=sys.stderr)
+
+
+def _get_upstream_remote(repo_path: Path) -> str:
+    """Get the remote name for the current branch's upstream."""
+    try:
+        r = subprocess.run(
+            ["git", "for-each-ref", "--format=%(upstream:remotename)", "refs/heads/HEAD"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        remote = r.stdout.strip()
+        if remote:
+            return remote
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return "origin"
+
+
+# --- Output formatting ---
+
+def format_relative(p: Path) -> str:
+    """Try to show path relative to home, fall back to absolute."""
+    home = Path.home().resolve()
+    try:
+        return "~/" + str(p.resolve().relative_to(home))
+    except ValueError:
+        return str(p)
+
+
+COL_PATH_W = 40
+COL_BRANCH_W = 18
+COL_DIRTY_W = 7
+COL_SYNC_W = 15
+
+
+def format_table(statuses: list[RepoStatus], use_color: bool) -> str:
+    """Format repo statuses into an aligned table."""
+    if not statuses:
+        return _c("No git repositories found.", Colors.DIM, use_color)
+
+    # Build rows with PLAIN text (no ANSI codes)
+    rows: list[tuple[str, str, str, str]] = []
+    for s in statuses:
+        path_str = format_relative(s.path)
+        if len(path_str) > COL_PATH_W:
+            path_str = path_str[:COL_PATH_W - 1] + "…"
+        rows.append((
+            path_str,
+            s.branch,
+            _dirty_symbol_plain(s),
+            _sync_text_plain(s),
+        ))
+
+    # Header — pad plain text first, then color
+    lines: list[str] = []
+    header = (
+        f"{_c('PATH'.ljust(COL_PATH_W), Colors.BOLD, use_color)}  "
+        f"{_c('BRANCH'.ljust(COL_BRANCH_W), Colors.BOLD, use_color)}  "
+        f"{_c('DIRTY'.center(COL_DIRTY_W), Colors.BOLD, use_color)}  "
+        f"{_c('SYNC', Colors.BOLD, use_color)}"
+    )
+    lines.append(header)
+    sep = (
+        f"{'─' * COL_PATH_W}  {'─' * COL_BRANCH_W}  {'─' * COL_DIRTY_W}  {'─' * COL_SYNC_W}"
+    )
+    lines.append(sep)
+
+    # Data rows — pad plain text, then apply color per-cell
+    for (path_s, branch_s, dirty_s, sync_s), s in zip(rows, statuses):
+        dirty_clr = _dirty_color(s)
+        sync_clr = _sync_color(s)
+        lines.append(
+            f"{path_s:<{COL_PATH_W}}  "
+            f"{branch_s:<{COL_BRANCH_W}}  "
+            f"{_pad(dirty_s, COL_DIRTY_W, 'center', dirty_clr, use_color)}  "
+            f"{_c(sync_s, sync_clr, use_color)}"
+        )
+
+    return "\n".join(lines)
+
+
+def _dirty_symbol_plain(s: RepoStatus) -> str:
+    if s.error:
+        return "!"
+    if s.dirty_staged and s.dirty_unstaged:
+        return "●"
+    if s.dirty_staged:
+        return "S"
+    if s.dirty_unstaged:
+        return "M"
+    return "✓"
+
+
+def _dirty_color(s: RepoStatus) -> Optional[str]:
+    if s.error:
+        return Colors.RED
+    if s.dirty_staged and s.dirty_unstaged:
+        return Colors.RED
+    if s.dirty_staged or s.dirty_unstaged:
+        return Colors.YELLOW
+    return Colors.GREEN
+
+
+def _sync_text_plain(s: RepoStatus) -> str:
+    if s.error:
+        return "error"
+    if not s.has_upstream:
+        return "no upstream"
+    if s.ahead > 0 and s.behind > 0:
+        return f"diverged {s.behind}/{s.ahead}"
+    if s.behind > 0:
+        return f"behind {s.behind}"
+    if s.ahead > 0:
+        return f"ahead {s.ahead}"
+    return "✓"
+
+
+def _sync_color(s: RepoStatus) -> Optional[str]:
+    if s.error:
+        return Colors.RED
+    if not s.has_upstream:
+        return Colors.BLUE
+    if s.ahead > 0 and s.behind > 0:
+        return Colors.RED
+    if s.behind > 0:
+        return Colors.RED
+    if s.ahead > 0:
+        return Colors.YELLOW
+    return Colors.GREEN
+
+
+# --- Sorting ---
+
+_DIRTY_SEVERITY = {"!": 0, "●": 1, "S": 2, "M": 3, "✓": 4}
+
+
+def _sync_severity(s: RepoStatus) -> int:
+    """Lower = more urgent. 0=error, 1=diverged, 2=behind, 3=ahead, 4=no upstream, 5=clean."""
+    if s.error:
+        return 0
+    if s.ahead > 0 and s.behind > 0:
+        return 1
+    if s.behind > 0:
+        return 2
+    if s.ahead > 0:
+        return 3
+    if not s.has_upstream:
+        return 4
+    return 5  # in sync
+
+
+def _sort_key(s: RepoStatus) -> tuple[int, int, str]:
+    return (
+        _DIRTY_SEVERITY.get(_dirty_symbol_plain(s), 5),
+        _sync_severity(s),
+        str(s.path),
+    )
+
+
+# --- CLI ---
+
+def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Check git repository status for multiple paths/patterns.",
+        epilog=(
+            "Examples:\n"
+            "  repostatus ~/Work/hosted\n"
+            "  repostatus ~/Work/*\n"
+            "  repostatus . --depth 2 --fetch\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "paths", nargs="*", default=[],
+        help="Directory paths or glob patterns to scan (default: current directory)",
+    )
+    parser.add_argument(
+        "--depth", "-d", type=int, default=1,
+        help="Max recursion depth when searching for repos (default: 1, 0 = no recursion)",
+    )
+    parser.add_argument(
+        "--fetch", "-f", action="store_true",
+        help="Run git fetch before checking sync status",
+    )
+    parser.add_argument(
+        "--no-color", action="store_true",
+        help="Disable colored output",
+    )
+    parser.add_argument(
+        "--no-sort", action="store_true",
+        help="Do not sort output; show repos in discovery order",
+    )
+    return parser.parse_args(argv)
+
+
+def main() -> None:
+    args = parse_args()
+
+    paths = args.paths if args.paths else ["."]
+    dirs = resolve_paths(paths)
+
+    if not dirs:
+        print("No valid directories to scan.", file=sys.stderr)
+        sys.exit(1)
+
+    repos = find_git_repos(dirs, args.depth)
+
+    if not repos:
+        print("No git repositories found.", file=sys.stderr)
+        return
+
+    # Inspect repos in parallel — git commands are I/O-bound (network + disk)
+    max_workers = min(len(repos), max(os.cpu_count() or 2, 4))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(inspect_repo, r, do_fetch=args.fetch): r for r in repos}
+        status_map = {}
+        for f in futures:
+            try:
+                status_map[f] = f.result(timeout=30 + _FETCH_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                repo_path = futures[f]
+                status_map[f] = RepoStatus(
+                    path=repo_path, branch="(timeout)",
+                    dirty_unstaged=False, dirty_staged=False,
+                    has_upstream=False, ahead=0, behind=0,
+                    error="inspection timed out",
+                )
+    statuses = [status_map[f] for f in futures]
+
+    # Sort: dirty (most severe first) → sync (most severe first) → path
+    if not args.no_sort:
+        statuses.sort(key=_sort_key)
+
+    use_color = should_use_color(args.no_color)
+    print(format_table(statuses, use_color))
+
+
+if __name__ == "__main__":
+    main()

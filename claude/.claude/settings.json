@@ -4,6 +4,7 @@
     "DISABLE_AUTOUPDATER": "1",
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0",
     "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
   },
   "permissions": {
@@ -20,11 +21,13 @@
       "mcp__tavily__tavily_research",
       "mcp__tavily__tavily_crawl"
     ],
+    "deny": [],
     "ask": [
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Read(outside)",
+      "Write(outside)"
     ],
-    "deny": [],
     "defaultMode": "plan"
   },
   "hooks": {
@@ -37,6 +40,16 @@
             "command": "npx -y ccstatusline@latest --hook"
           }
         ]
+      },
+      {
+        "_tag": "ccstatusline-managed",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y ccstatusline@latest --hook"
+          }
+        ],
+        "matcher": "Skill"
       }
     ],
     "Notification": [
@@ -62,6 +75,15 @@
     ],
     "UserPromptSubmit": [
       {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y ccstatusline@latest --hook"
+          }
+        ]
+      },
+      {
+        "_tag": "ccstatusline-managed",
         "hooks": [
           {
             "type": "command",

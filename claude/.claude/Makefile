@@ -10,14 +10,14 @@ clean:
 		session-env/ \
 		sessions/ \
 		shell-snapshots/ \
-		tasks/ \
-		telemetry/ \
-		history.jsonl
+		tasks/
 
 .PHONY: prune
 prune: clean
 	$(RM) -rf plans/ \
 		projects/ \
 		backups/ \
+		telemetry/ \
+		history.jsonl \
 		$(HOME)/.claude.json
 	claude mcp add-json --scope user tavily "$$(cat $(CURDIR)/mcp.json)"
