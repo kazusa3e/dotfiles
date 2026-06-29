@@ -5,7 +5,8 @@
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0",
-    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1"
   },
   "permissions": {
     "allow": [
@@ -26,7 +27,9 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Read(outside)",
-      "Write(outside)"
+      "Write(outside)",
+      "Bash(rm *)",
+      "Bash(mv *)"
     ],
     "defaultMode": "plan"
   },
@@ -42,14 +45,22 @@
         ]
       },
       {
-        "_tag": "ccstatusline-managed",
+        "matcher": "Skill",
         "hooks": [
           {
             "type": "command",
             "command": "npx -y ccstatusline@latest --hook"
           }
-        ],
-        "matcher": "Skill"
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ccstatusline --hook"
+          }
+        ]
       }
     ],
     "Notification": [
@@ -83,11 +94,18 @@
         ]
       },
       {
-        "_tag": "ccstatusline-managed",
         "hooks": [
           {
             "type": "command",
             "command": "npx -y ccstatusline@latest --hook"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ccstatusline --hook"
           }
         ]
       }
@@ -95,7 +113,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "npx -y ccstatusline@latest",
+    "command": "ccstatusline",
     "padding": 0,
     "refreshInterval": 10
   },
@@ -103,6 +121,7 @@
     "clangd-lsp@claude-plugins-official": true
   },
   "effortLevel": "medium",
+  "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "verbose": false,
   "autoCompactEnabled": false,
