@@ -4,8 +4,8 @@ none:
 
 .PHONY: install
 install:
-	claude mcp add-json --scope user tavily "$$(jq -c .tavily $(CURDIR)/mcp-servers.json)"
-	claude mcp add-json --scope user duckduckgo "$$(jq -c .duckduckgo $(CURDIR)/mcp-servers.json)"
+	claude mcp add-json --scope user tavily "$$(jq -c .tavily $(CURDIR)/mcp.json)"
+	claude mcp add-json --scope user duckduckgo "$$(jq -c .duckduckgo $(CURDIR)/mcp.json)"
 
 .PHONY: clean
 clean:
