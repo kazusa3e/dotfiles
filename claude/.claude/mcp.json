@@ -1,8 +1,18 @@
 {
-  "type": "stdio",
-  "command": "npx",
-  "args": ["-y", "tavily-mcp"],
-  "env": {
-    "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+  "tavily": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "tavily-mcp"],
+    "env": {
+      "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+    }
+  },
+  "duckduckgo": {
+    "type": "stdio",
+    "command": "uvx",
+    "args": ["duckduckgo-mcp-server"],
+    "env": {
+      "DDG_SAFE_SEARCH": "OFF"
+    }
   }
 }

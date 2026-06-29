@@ -71,6 +71,7 @@ def compose_env(provider: Provider, config: Config) -> dict:
         env['ANTHROPIC_DEFAULT_SONNET_MODEL'] = provider.sonnet_model
     if provider.haiku_model:
         env['ANTHROPIC_DEFAULT_HAIKU_MODEL'] = provider.haiku_model
+        env['ANTHROPIC_SMALL_FAST_MODEL'] = provider.haiku_model
     if provider.subagent_model:
         env['SUBAGENT_MODEL'] = provider.subagent_model
 

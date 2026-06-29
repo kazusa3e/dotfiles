@@ -2,6 +2,11 @@
 none:
 	@echo "Usage: make <target>"
 
+.PHONY: install
+install:
+	claude mcp add-json --scope user tavily "$$(jq -c .tavily $(CURDIR)/mcp-servers.json)"
+	claude mcp add-json --scope user duckduckgo "$$(jq -c .duckduckgo $(CURDIR)/mcp-servers.json)"
+
 .PHONY: clean
 clean:
 	$(RM) -rf cache/ \
@@ -20,4 +25,4 @@ prune: clean
 		telemetry/ \
 		history.jsonl \
 		$(HOME)/.claude.json
-	claude mcp add-json --scope user tavily "$$(cat $(CURDIR)/mcp.json)"
+
