@@ -96,8 +96,8 @@ nnoremap O O<esc>                       " insert new line above, stay normal mod
 " }}}
 
 " display move {{{
-nnoremap j gj                           " move down by display line (for wrapped lines)
-nnoremap k gk                           " move up by display line (for wrapped lines)
+" nnoremap j gj                           " move down by display line (for wrapped lines)
+" nnoremap k gk                           " move up by display line (for wrapped lines)
 " }}}
 
 " indent {{{
