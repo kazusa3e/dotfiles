@@ -3,102 +3,31 @@ alias l="eza --classify --reverse --sort=modified"
 alias ll="eza --classify --all --long --reverse --sort=modified"
 
 # git
-alias gl="git log --color --graph --pretty=format:'%Cred%h%Creset - %s%C(yellow)%d%Creset %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit $*"
-alias gla="gl --all $*"
-alias gs="git status -sb $*"
-alias gb="git branch $*"
-alias gd="git diff $*"
-alias gdp="git diff HEAD^ $*"
-alias gds="git diff --staged $*"
-alias gco="git checkout $*"
+alias gl="git log --color --graph --pretty=format:'%Cred%h%Creset - %s%C(yellow)%d%Creset %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
+alias gla="gl --all"
+alias gs="git status -sb"
+alias gb="git branch"
+alias gd="git diff"
+alias gdp="git diff HEAD^"
+alias gds="git diff --staged"
+alias gco="git checkout"
 alias gaa="git add -A"
-function gcm() {
-    if [ "$1" ]; then
-        git commit -m "$1"
-    else
-        git commit
-    fi
-}
-alias gph="git push $*"
-alias gpl="git pull $*"
-alias gr="git remote $*"
-function ga () {
-    p=${PWD##*/}
-    git archive --verbose --output "$p.tar" HEAD
-}
+alias gph="git push"
+alias gpl="git pull"
 alias gcn="git clean -fd && git reset --hard HEAD"
 alias gg="lazygit"
 
 # tmux
 function t () {
     p=${PWD##*/}
-    case "$1" in
-        n)
-            if [[ -z "$2" ]]; then
-                tmux new-session -d -s $p
-            else
-                tmux new-session -d -s "$2"
-            fi
-            ;;
-        x)
-            if [[ -z "$2" ]]; then
-                tmux new-session -s $p
-            else
-                tmux new-session -s "$2"
-            fi
-            ;;
-        a)
-            if [[ -z "$2" ]]; then
-                tmux attach -t $p
-            else
-                tmux attach -t "$2"
-            fi
-            ;;
-        d)
-            cd
-            tmux attach -t tmp || tmux new-session -s tmp
-            ;;
-        k)
-            tmux kill-session -t "$2"
-            ;;
-        l)
-            tmux ls
-            ;;
-    esac
+
+    if [[ -z "$1" ]]; then
+        tmux attach -t $p || tmux new-session -s $p
+    else
+        tmux attach -t "$1" || tmux new-session -s "$1"
+    fi
 }
 
-# gpg
-function gpgd () {
-    gpg --decrypt --output ${1%".gpg"} $1
-}
-
-
-alias bat="bat -p $*"
-
-alias mk="make -f cmd.mk $*"
-
-alias todo='f() { echo "- [ ] $*" >> ~/wiki/Inbox.md }; f'
-
-# function cc() {
-#
-#     local base_url="${CC_USE}_ANTHROPIC_BASE_URL"
-#     local auth_token="${CC_USE}_ANTHROPIC_AUTH_TOKEN"
-#     local model="${CC_USE}_ANTHROPIC_MODEL"
-#     local default_opus_model="${CC_USE}_ANTHROPIC_DEFAULT_OPUS_MODEL"
-#     local default_sonnet_model="${CC_USE}_ANTHROPIC_DEFAULT_SONNET_MODEL"
-#     local default_haiku_model="${CC_USE}_ANTHROPIC_DEFAULT_HAIKU_MODEL"
-#
-#     # CLAUDE_CODE_EFFORT_LEVEL="max" \
-#     ANTHROPIC_BASE_URL="${(P)base_url}" \
-#         ANTHROPIC_AUTH_TOKEN="${(P)auth_token}" \
-#         ANTHROPIC_MODEL="${(P)model}" \
-#         ANTHROPIC_DEFAULT_OPUS_MODEL="${(P)default_opus_model}" \
-#         ANTHROPIC_DEFAULT_SONNET_MODEL="${(P)default_sonnet_model}" \
-#         ANTHROPIC_DEFAULT_HAIKU_MODEL="${(P)default_haiku_model}" \
-#         TAVILY_API_KEY="${TAVILY_API_KEY}" \
-#         claude "$@"
-# }
-
-alias oc="opencode $*"
+alias mk="make -f cmd.mk"
 
 # vim: ft=zsh

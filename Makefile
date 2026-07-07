@@ -1,41 +1,36 @@
 os := $(shell uname -s)
+tmux_plugin_dir := ~/.tmux/plugins
 
-# is_wsl := no
-# ifeq ($(os),Linux)
-# 	is_wsl = $(shell uname -a | grep -q 'WSL' && echo yes || echo no)
-# endif
-
-app := zsh vim tmux starship git clangd lazygit alacritty yazi npm claude ccstatusline opencode
+# app := zsh vim tmux starship git clangd lazygit alacritty yazi npm claude ccstatusline opencode
+app := zsh vim tmux starship git npm
 
 ifeq ($(os),Darwin)
-	app += karabiner idea hammerspoon brew wezterm
+	app += karabiner hammerspoon wezterm
 endif
 
-# windows_user :=
-# ifeq ($(is_wsl),yes)
-# 	windows_user := $(shell powershell.exe -NoProfile -NonInteractive -Command "\$$Env:UserName" | sed 's/\r//g')
-# endif
+.PHONY: none
+none:
+	@echo "Usage: make <target>"
 
 .PHONY: install
 install:
 	stow -t ~ $(app)
 
-	# if [ "$(is_wsl)" = "yes" ]; then \
-	# 	mkdir -p "/mnt/c/Users/$(windows_user)/Documents/AutoHotkey"; \
-	# 	cp autohotkey/keybindings.ahk "/mnt/c/Users/$(windows_user)/Documents/AutoHotkey/"; \
-	# fi
+	mkdir -p $(tmux_plugin_dir)
+	[ -d $(tmux_plugin_dir)/catppuccin ] || git clone --depth 1 https://github.com/catppuccin/tmux.git $(tmux_plugin_dir)/catppuccin
+	[ -d $(tmux_plugin_dir)/tmux-resurrect ] || git clone --depth 1 https://github.com/tmux-plugins/tmux-resurrect.git $(tmux_plugin_dir)/tmux-resurrect
+	[ -d $(tmux_plugin_dir)/tmux-continuum ] || git clone --depth 1 https://github.com/tmux-plugins/tmux-continuum.git $(tmux_plugin_dir)/tmux-continuum
+
+	-fd . bin/ -0 | xargs -I{} --null sh -c 'ln -s "$$(pwd)/{}" "$$HOME/.local/bin/$$(basename {})"'
 
 	if [ "$(os)" = "Darwin" ]; then \
 		goku; \
 	fi
-	-fd . bin/ -0 | xargs -I{} --null sh -c 'ln -s "$$(pwd)/{}" "$$HOME/.local/bin/$$(basename {})"'
 
 
 .PHONY: uninstall
 uninstall:
 	stow -t ~ --delete $(app)
 
-	# if [ "$(is_wsl)" = "yes" ]; then \
-	# 	rm "/mnt/c/Users/$(windows_user)/Documents/AutoHotkey/keybindings.ahk"; \
-	# fi
+	-rm -rf $(tmux_plugin_dir)
 	-fd . bin/ -0 | xargs -I{} --null sh -c 'rm "$$HOME/.local/bin/$$(basename {})"'

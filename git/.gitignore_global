@@ -8,4 +8,3 @@ cmd.mk
 .cache/
 compile_commands.json
 
-.claude/

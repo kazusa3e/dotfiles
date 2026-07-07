@@ -1,194 +1,123 @@
 " basic {{{
-set nocompatible
-set hidden
-set modeline
-set modelines=1
-set number
-set backspace=indent,eol,start
-filetype plugin indent on
-syntax on
-set encoding=utf-8
-set noswapfile
-set undofile
-set undodir=$HOME/.vim/undo
-set cursorline
-set autoread
-set updatetime=500
-set scrolloff=5
-let mapleader=' '
-set mouse=a
-autocmd FileType * set formatoptions-=cro
-set signcolumn=number
-set sessionoptions+=tabpages,globals
-set nrformats+=alpha
-set ttimeoutlen=5
-set exrc
+set nocompatible                        " disable vi-compatibility mode
+set hidden                              " allow hiding unsaved buffers
+set number                              " show line numbers
+set backspace=indent,eol,start          " allow backspace over indent/eol/start
+filetype plugin indent on               " enable filetype detection, plugins & indent
+syntax on                               " enable syntax highlighting
+set encoding=utf-8                      " set internal encoding to UTF-8
+set noswapfile                          " disable swap files
+set undofile                            " enable persistent undo
+set undodir=$HOME/.vim/undo             " directory for undo files
+set cursorline                          " highlight the current line
+set autoread                            " auto-reload externally changed files
+set updatetime=500                      " trigger swap write / CursorHold after 500ms
+set scrolloff=5                         " keep 5 lines visible around cursor
+let mapleader=' '                       " set leader key to space
+set mouse=a                             " enable mouse in all modes
+set signcolumn=number                   " merge sign column with line number
+set sessionoptions+=tabpages,globals    " save tab pages and globals in sessions
+set nrformats+=alpha                    " allow <C-a>/<C-x> on letters
+" set modeline                            " enable mode lines in files
+" set modelines=1                         " scan first/last 1 line for mode lines
+" set exrc                                " allow per-directory .vimrc / .exrc
 " }}}
 
 " indent {{{
-set expandtab
-set autoindent
-set smartindent
+set expandtab                           " use spaces instead of tabs
+set autoindent                          " copy indent from current line
+set smartindent                         " smart auto-indent for C-like syntax
 
-set tabstop=4
-set shiftwidth=0
-set textwidth=0
-set softtabstop=-1
-set wrap
+set tabstop=4                           " display tabs as 4 spaces
+set shiftwidth=0                        " use tabstop value for shifting
+set textwidth=0                         " disable automatic hard wrapping
+set softtabstop=-1                      " follow shiftwidth/tabstop behavior
+" set wrap                                " wrap long lines visually
 " }}}
 
 " search {{{
-set ignorecase
-set smartcase
-set incsearch
-set hlsearch
-nnoremap <c-n> <cmd>nohlsearch<cr>
-"}}}
-
-" fold {{{
-set foldlevel=99
-set foldcolumn=0
-set foldmethod=expr
-" }}}
-
-" markdown {{{
-" autocmd FileType markdown setlocal conceallevel=2
-" autocmd FileType markdown setlocal textwidth=0
-" autocmd FileType markdown setlocal spell
-" autocmd FileType markdown setlocal nowrap
-" autocmd FileType markdown setlocal foldmethod=expr
-" autocmd FileType markdown setlocal foldexpr=GetPotionFold(v:lnum)
-" nnoremap <leader>nn <cmd>e $HOME/todo.md<cr>
+set ignorecase                          " case-insensitive search
+set smartcase                           " case-sensitive if uppercase present
+set incsearch                           " incremental search (live highlighting)
+set hlsearch                            " highlight all search matches
+nnoremap <c-n> <cmd>nohlsearch<cr>      " clear search highlighting
 " }}}
 
 " disable keybindings {{{
+
+" defined in neovim
+
+" disable s (surround)
 nnoremap s <nop>
 nnoremap S <nop>
-nnoremap a <nop>
-" nnoremap m <nop>
-" nnoremap M <nop>
-nnoremap q <nop>
-nnoremap Q <nop>
-xnoremap q <nop>
-xnoremap Q <nop>
-" nnoremap m q
-" nnoremap M Q
 xnoremap s <nop>
 xnoremap S <nop>
-nnoremap <F1> <nop>
-" nnoremap t <nop>
-" nnoremap T <nop>
-" nnoremap t m
+
+" disable q (comment)
+" use `Q` to record macros instead of `q`
+nnoremap Q q
+xnoremap Q q
+nnoremap q <nop>
+xnoremap q <nop>
 " }}}
 
 " buffer {{{
-" TODO: recent buffer
-" nnoremap <c-e> <cmd>bprevious<cr>
-nnoremap [b <cmd>bprevious<cr>
-nnoremap ]b <cmd>bnext<cr>
-nnoremap <leader>N <cmd>enew<cr>
-nnoremap <leader>x <cmd>bufdo bw<cr>
+nnoremap [b <cmd>bprevious<cr>          " previous buffer
+nnoremap ]b <cmd>bnext<cr>              " next buffer
+nnoremap <leader>x <cmd>bufdo bw<cr>    " close all buffers
+ " close current buffer and switch to next
 nnoremap <s-x> <cmd>try <bar> bn <bar> bd # <bar> catch <bar> enew <bar> endtry <cr>
-nnoremap <leader>z `.
+nnoremap <leader>z `.                   " jump to last change position
 " }}}
 
 " window {{{
-nnoremap <c-h> <c-w>h
-nnoremap <c-l> <c-w>l
-nnoremap <c-j> <c-w>j
-nnoremap <c-k> <c-w>k
-
-inoremap <c-h> <esc><c-w>h
-inoremap <c-l> <esc><c-w>l
-inoremap <c-j> <esc><c-w>j
-inoremap <c-k> <esc><c-w>k
-
-nnoremap <s-h> <c-w><
-nnoremap <s-l> <c-w>>
-nnoremap <s-j> <c-w>-
-nnoremap <s-k> <c-w>+
-" }}}
-
-" quickfix {{{
-nnoremap [q <cmd>cp<cr>
-nnoremap ]q <cmd>cn<cr>
-" nnoremap qf <cmd>cw<cr>
-" }}}
-
-" tab {{{
-nnoremap <leader>hn <cmd>tabnew<cr>
-nnoremap <leader>he <cmd>tabnext<cr>
-nnoremap <leader>hx <cmd>tabclose<cr>
+nnoremap <c-h> <c-w>h                   " move to left window
+nnoremap <c-l> <c-w>l                   " move to right window
+nnoremap <c-j> <c-w>j                   " move to window below
+nnoremap <c-k> <c-w>k                   " move to window above
 " }}}
 
 " split {{{
-set splitbelow
-set splitright
-nnoremap <leader>\ <cmd>split<cr>
-nnoremap <leader>\| <cmd>vsplit<cr>
+set splitbelow                          " horizontal split puts new window below
+set splitright                          " vertical split puts new window to the right
+nnoremap <leader>\ <cmd>split<cr>       " horizontal split
+nnoremap <leader>\| <cmd>vsplit<cr>     " vertical split
 " }}}
 
 " yank {{{
-nnoremap Y "+y
-nnoremap YY "+yy
-xnoremap Y "+y
-nmap <leader>y taggVGy`a
-nmap <leader>Y taggVG"+y`a
+nnoremap Y "+y                          " yank to system clipboard
+nnoremap YY "+yy                        " yank line to system clipboard
+xnoremap Y "+y                          " visual mode yank to system clipboard
 " }}}
 
 " new line {{{
-nnoremap o o<esc>
-nnoremap O O<esc>
+nnoremap o o<esc>                       " insert new line below, stay normal mode
+nnoremap O O<esc>                       " insert new line above, stay normal mode
 " }}}
 
-" quick move {{{
-nnoremap j gj
-nnoremap k gk
+" display move {{{
+nnoremap j gj                           " move down by display line (for wrapped lines)
+nnoremap k gk                           " move up by display line (for wrapped lines)
 " }}}
 
 " indent {{{
-xnoremap < <gv
-xnoremap > >gv
-" }}}
-
-" line object {{{
-xnoremap il g_o^
-onoremap il :normal vil<CR>
-xnoremap al $o0
-onoremap al :normal val<CR>
-" }}}
-
-" neovide {{{
-if exists("g:neovide")
-    set guifont=Comic\ Mono:h12
-    set linespace=4
-    let g:neovide_cursor_vfx_mode = "torpedo"
-endif
+xnoremap < <gv                          " indent left and keep selection
+xnoremap > >gv                          " indent right and keep selection
 " }}}
 
 " colorscheme {{{
 if has('termguicolors')
-    set termguicolors
+    set termguicolors                   " enable true color support
 endif
-let s:use_theme = getenv('USE_THEME')
-if s:use_theme == "light"
-    set background=light
-else
-    set background=dark
-endif
-" }}}
-
-" edit {{{
-inoremap <C-e> <esc>A
-inoremap <C-a> <esc>I
+set background=dark                     " use dark background theme
+colorscheme default                     " set colorscheme to default
 " }}}
 
 " terminal {{{
 if exists("##TermOpen")
-    autocmd TermOpen * setlocal nonumber
-    autocmd TermOpen * startinsert
+    autocmd TermOpen * setlocal nonumber    " hide line numbers in terminal
+    autocmd TermOpen * startinsert          " enter insert mode when opening terminal
 endif
 " }}}
-
 
 " vim: foldmethod=marker
