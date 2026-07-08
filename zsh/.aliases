@@ -61,6 +61,10 @@ function pid () {
         "${docker_args[@]}"
     )
 
+    if [[ -f "$HOME/.gitconfig" ]]; then
+        docker_args+=(-v "$HOME/.gitconfig:$HOME/.gitconfig")
+    fi
+
     if [[ "$mount_cwd" -eq 1 ]]; then
         docker_args+=(-v "$PWD:$PWD" --workdir "$PWD")
     else
