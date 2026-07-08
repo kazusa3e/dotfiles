@@ -18,6 +18,9 @@ function is_linux() {
 export EDITOR=nvim
 export VISUAL=nvim
 
+# force true color
+export COLORTERM=truecolor
+
 # vim mode
 bindkey -v
 
