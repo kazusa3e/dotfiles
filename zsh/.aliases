@@ -55,7 +55,7 @@ function pid () {
     docker_args=(
         --rm -it
         --userns=keep-id
-        # --net=host
+        # --network=host
         -e HOME="$HOME"
         -v "$HOME/.pi:$HOME/.pi"
         "${docker_args[@]}"
