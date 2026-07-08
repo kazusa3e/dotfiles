@@ -31,11 +31,9 @@ try_eval starship init zsh
 if is_linux; then
     try_source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
     try_source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-    try_source /usr/share/zsh/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh
 elif is_darwin; then
     try_source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
     try_source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-    try_source /usr/local/share/zsh-autocomplete/zsh-autocomplete.plugin.zsh
 fi
 
 # local bin
