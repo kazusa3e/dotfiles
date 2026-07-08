@@ -28,6 +28,48 @@ function t () {
     fi
 }
 
+# pi-coding-agent
+function pid () {
+    local docker="podman"
+    local image_name="pid"
+    local -a docker_args=() pi_args=()
+    local mount_cwd=0
+    local after_ddash=0
+
+    for arg in "$@"; do
+        if [[ "$after_ddash" -eq 0 ]] && [[ "$arg" == "--cwd" ]]; then
+            mount_cwd=1
+            continue
+        fi
+        if [[ "$after_ddash" -eq 0 ]] && [[ "$arg" == "--" ]]; then
+            after_ddash=1
+            continue
+        fi
+        if [[ "$after_ddash" -eq 1 ]]; then
+            pi_args+=("$arg")
+        else
+            docker_args+=("$arg")
+        fi
+    done
+
+    docker_args=(
+        --rm -it
+        --userns=keep-id
+        # --net=host
+        -e HOME="$HOME"
+        -v "$HOME/.pi:$HOME/.pi"
+        "${docker_args[@]}"
+    )
+
+    if [[ "$mount_cwd" -eq 1 ]]; then
+        docker_args+=(-v "$PWD:$PWD" --workdir "$PWD")
+    else
+        docker_args+=(--workdir "/workspace")
+    fi
+
+    ${docker} run "${docker_args[@]}" ${image_name} "${pi_args[@]}"
+}
+
 alias mk="make -f cmd.mk"
 
 # vim: ft=zsh

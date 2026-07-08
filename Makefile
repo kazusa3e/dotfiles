@@ -2,7 +2,7 @@ os := $(shell uname -s)
 tmux_plugin_dir := ~/.tmux/plugins
 
 # app := zsh vim tmux starship git clangd lazygit alacritty yazi npm claude ccstatusline opencode
-app := zsh vim tmux starship git npm
+app := zsh vim tmux starship git npm pi
 
 ifeq ($(os),Darwin)
 	app += karabiner hammerspoon wezterm

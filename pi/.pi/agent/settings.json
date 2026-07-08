@@ -1,0 +1,12 @@
+{
+  "defaultThinkingLevel": "high",
+  "packages": [
+    "npm:pi-lynx"
+  ],
+  "theme": "dark",
+  "enableInstallTelemetry": false,
+  "steeringMode": "all",
+  "compaction": {
+    "enabled": false
+  }
+}
