@@ -15,7 +15,7 @@ feat: add user avatar upload endpoint
 fix(login): handle expired refresh token
 
 # Internal refactor, no behavior change
-refact: extract date parsing into helper module
+refactor: extract date parsing into helper module
 
 # Use a scope when the change is isolated to one area
 docs(readme): clarify setup steps for macOS
@@ -29,9 +29,9 @@ git commit \
 ```
 
 Notes:
-- **Header format is `<type>(<scope>): <subject>`** — a single space on left sides of the colon, e.g.: `type(scope): subject`. Allowed types: `feat`, `fix`, `refact`, `docs`, `chore`, `perf`, `test`, `build`, `ci`, `style`.
+- **Header format is `<type>(<scope>): <subject>`** — a single space after the colon, e.g.: `type(scope): subject`. Allowed types: `feat`, `fix`, `refactor`, `docs`, `chore`, `perf`, `test`, `build`, `ci`, `style`, `revert`.
 - Subject line stays under 72 characters and uses imperative mood ("add", not "added").
-- A scope in parentheses is optional but recommended when the change is localized. When omitted, the format is `<type> : <subject>`.
+- A scope in parentheses is optional but recommended when the change is localized. When omitted, the format is `<type>: <subject>`.
 - Use a body (via additional `-m` flags) only when the *why* is not obvious from the diff; otherwise keep it to a single line.
 - When a body is needed, format it as bullet points — one `-` per distinct change or rationale — rather than a single paragraph. This keeps it scannable in `git log` and on code-review UIs.
 
@@ -42,6 +42,6 @@ Follow these steps:
 3. If there are staged changes:
    a. Run `git diff --cached` to read the full diff and understand the changes.
    b. If an argument was provided (i.e. `$@` is non-empty), use `$@` as the commit message.
-   c. If no argument was provided (`$@` is empty), generate a concise English commit message based on the diff content. Use the format `<type>(<scope>): <subject>` — note the spaces on both sides of the colon — with one of the allowed types `feat`, `fix`, `refact`, `docs`, `chore`, `perf`, `test`, `build`, `ci`, `style`. Keep the subject under 72 characters.
-   d. Run `git commit -m "<message>"` to commit.
+   c. If no argument was provided (`$@` is empty), generate a concise English commit message based on the diff content. Use the format `<type>(<scope>): <subject>` — note the single space after the colon — with one of the allowed types `feat`, `fix`, `refactor`, `docs`, `chore`, `perf`, `test`, `build`, `ci`, `style`, `revert`. Keep the subject under 72 characters.
+   d. Run git commit with the message. If it is a single-line subject, use `git commit -m "<message>"`. If it includes a body, pass each line via separate `-m` flags, matching the multi-line demo above.
    e. Report the final commit message to the user.
