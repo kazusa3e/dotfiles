@@ -108,7 +108,6 @@ xnoremap > >gv                          " indent right and keep selection
 " colorscheme {{{
 if has('termguicolors')
     set termguicolors                   " enable true color support
-    highlight Normal guibg=NONE         " inherit terminal background
 endif
 set background=dark                     " use dark background theme
 colorscheme default                     " set colorscheme to default
@@ -119,6 +118,17 @@ if exists("##TermOpen")
     autocmd TermOpen * setlocal nonumber    " hide line numbers in terminal
     autocmd TermOpen * startinsert          " enter insert mode when opening terminal
 endif
+" }}}
+
+" restore cursor position {{{
+autocmd BufReadPost *
+  \ if line("'\"") > 0 && line("'\"") <= line("$") |
+  \   execute "normal! g`\"" |
+  \ endif
+" }}}
+
+" fix Normal background (Neovim 0.12 overrides it) {{{
+autocmd VimEnter * highlight Normal guibg=NONE
 " }}}
 
 " vim: foldmethod=marker
