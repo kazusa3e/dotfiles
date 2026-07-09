@@ -108,6 +108,7 @@ xnoremap > >gv                          " indent right and keep selection
 " colorscheme {{{
 if has('termguicolors')
     set termguicolors                   " enable true color support
+    highlight Normal guibg=NONE         " inherit terminal background
 endif
 set background=dark                     " use dark background theme
 colorscheme default                     " set colorscheme to default
