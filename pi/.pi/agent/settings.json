@@ -8,5 +8,6 @@
   "steeringMode": "all",
   "compaction": {
     "enabled": false
-  }
+  },
+  "hideThinkingBlock": true
 }

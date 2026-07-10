@@ -55,7 +55,6 @@ function pid () {
     docker_args=(
         --rm -it
         --userns=keep-id
-        # --network=host
         -e HOME="$HOME"
         -v "$HOME/.pi:$HOME/.pi"
         "${docker_args[@]}"
@@ -70,6 +69,9 @@ function pid () {
     else
         docker_args+=(--workdir "/workspace")
     fi
+
+    local cname="${image_name}-${PWD##*/}-$(date +%d%H%M)"
+    docker_args+=("--name" "$cname")
 
     ${docker} run "${docker_args[@]}" ${image_name} "${pi_args[@]}"
 }
