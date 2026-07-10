@@ -57,6 +57,7 @@ function pid () {
         --userns=keep-id
         -e HOME="$HOME"
         -v "$HOME/.pi:$HOME/.pi"
+        -v "$HOME/.pi-lens:$HOME/.pi-lens"
         "${docker_args[@]}"
     )
 
