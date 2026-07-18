@@ -2,10 +2,9 @@
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-lynx",
-    "npm:pi-claude-style-tools",
     "npm:pi-mcp-adapter",
-    "npm:pi-lens",
-    "npm:@odinlayer/pi-statusbar"
+    "npm:@odinlayer/pi-statusbar",
+    "npm:pi-claude-code-ui"
   ],
   "theme": "dark",
   "enableInstallTelemetry": false,
