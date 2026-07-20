@@ -109,8 +109,8 @@ xnoremap > >gv                          " indent right and keep selection
 if has('termguicolors')
     set termguicolors                   " enable true color support
 endif
-set background=dark                     " use dark background theme
 colorscheme default                     " set colorscheme to default
+set background=dark                     " use dark background theme
 " }}}
 
 " terminal {{{
