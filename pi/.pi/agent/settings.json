@@ -6,7 +6,7 @@
     "npm:@odinlayer/pi-statusbar",
     "npm:pi-claude-code-ui"
   ],
-  "theme": "light",
+  "theme": "dark",
   "enableInstallTelemetry": false,
   "steeringMode": "all",
   "compaction": {
