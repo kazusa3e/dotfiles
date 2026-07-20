@@ -65,6 +65,9 @@ setopt INC_APPEND_HISTORY_TIME          # append history with timestamp
 # npm
 export PATH="$HOME/.local/share/npm-global/bin:$PATH"
 
+# podman
+export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
+
 # <c-g> to edit this command here
 autoload -z edit-command-line
 zle -N edit-command-line
