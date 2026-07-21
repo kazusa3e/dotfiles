@@ -58,6 +58,7 @@ function pid () {
         -e HOME="$HOME"
         -v "$HOME/.gitconfig:$HOME/.gitconfig"
         -v "$HOME/.pi:$HOME/.pi"
+        -v "$HOME/.agents:$HOME/.agents"
         "${docker_args[@]}"
     )
 
