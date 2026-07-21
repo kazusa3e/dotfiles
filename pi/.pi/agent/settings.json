@@ -4,7 +4,8 @@
     "npm:pi-lynx",
     "npm:pi-mcp-adapter",
     "npm:@odinlayer/pi-statusbar",
-    "npm:pi-claude-code-ui"
+    "npm:pi-claude-code-ui",
+    "npm:pi-ask-user"
   ],
   "theme": "dark",
   "enableInstallTelemetry": false,
