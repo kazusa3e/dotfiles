@@ -129,6 +129,9 @@ autocmd BufReadPost *
 
 " fix Normal background (Neovim 0.12 overrides it) {{{
 autocmd VimEnter * highlight Normal guibg=NONE
+if has('nvim')
+  autocmd VimEnter * highlight NormalFloat guibg=NONE
+endif
 " }}}
 
 " vim: foldmethod=marker
