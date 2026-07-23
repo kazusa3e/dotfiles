@@ -1,5 +1,5 @@
 {
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "max",
   "packages": [
     "npm:pi-lynx",
     "npm:pi-mcp-adapter",

@@ -105,6 +105,31 @@ xnoremap < <gv                          " indent left and keep selection
 xnoremap > >gv                          " indent right and keep selection
 " }}}
 
+" completion & fold & formatoptions (shared with Neovim) {{{
+" 'complete': sources insert-mode completion draws from, in priority order.
+" a '^N' suffix limits that source to N matches. See :help 'complete'.
+set complete=.,w^5,b^5,u^5,t,i
+
+" 'completeopt': always show menu, don't pre-select first item.
+" (Neovim's autocomplete auto-enables 'noselect'; the 'popup' flag for
+" docs-in-popup-window is Neovim-only and is added separately in nvim.)
+set completeopt=menuone,noselect
+
+" Folds: keep disabled by default (Neovim sets tree-sitter foldexpr
+" separately; Vim defaults to manual folding, which is also off).
+set nofoldenable
+
+" 'formatoptions' is buffer-local and gets reset by filetype plugins on
+" FileType/BufEnter, so re-apply it in an autocmd instead of once at startup.
+" Flags: t auto-wrap text, c auto-wrap comments, q allow gq on comments,
+" n recognize numbered lists, l don't break long lines in insert mode,
+" j remove comment leader when joining with J.
+augroup formatoptions
+    autocmd!
+    autocmd FileType,BufEnter * if &buftype == '' | setlocal formatoptions=tcqnlj | endif
+augroup END
+" }}}
+
 " colorscheme {{{
 if has('termguicolors')
     set termguicolors                   " enable true color support
