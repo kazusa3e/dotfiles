@@ -163,6 +163,39 @@ function sessionCostFromBranch(branch: readonly unknown[]): number {
   return total;
 }
 
+/* Aggregate prompt-cache stats across the session branch.
+ * Cache hit rate = cacheRead / (input + cacheRead + cacheWrite), i.e. the
+ * fraction of total input-side tokens served from the cache. Returns null when
+ * the session has no cacheable input yet (denominator 0). */
+function sessionCacheFromBranch(branch: readonly unknown[]):
+  { rate: number; read: number; total: number } | null {
+  let read = 0, input = 0, write = 0;
+  for (const entry of branch) {
+    if (!entry || typeof entry !== "object") continue;
+    const rec = entry as Record<string, unknown>;
+    if (rec.type !== "message") continue;
+    const message = rec.message as Record<string, unknown> | undefined;
+    if (!message || message.role !== "assistant") continue;
+    const usage = message.usage as
+      { input?: number; cacheRead?: number; cacheWrite?: number } | undefined;
+    if (!usage) continue;
+    if (typeof usage.input === "number" && Number.isFinite(usage.input)) input += usage.input;
+    if (typeof usage.cacheRead === "number" && Number.isFinite(usage.cacheRead)) read += usage.cacheRead;
+    if (typeof usage.cacheWrite === "number" && Number.isFinite(usage.cacheWrite)) write += usage.cacheWrite;
+  }
+  const total = input + read + write;
+  if (total <= 0) return null;
+  return { rate: read / total, read, total };
+}
+
+/* Cache rate color: ≥80% green / ≥50% blue / ≥25% yellow / else grey. */
+function cacheRateColor(rate: number): string {
+  if (rate >= 0.8) return rgb(80, 220, 80);
+  if (rate >= 0.5) return rgb(80, 180, 255);
+  if (rate >= 0.25) return rgb(255, 215, 0);
+  return rgb(140, 140, 140);
+}
+
 /* ───────── Container detection ───────── */
 
 function detectContainerEnv(): "docker" | "local" {
@@ -190,7 +223,7 @@ type GitCache = {
 
 let gitCache: GitCache = { branch: null, diff: null, lines: null };
 let gitInFlight = false;
-// cwd -> { diff: "3M2A1D", lines: { added, deleted } }
+// cwd -> { diff: "M3 A2 D1", lines: { added, deleted } }
 const gitDiffCache = new Map<string, { diff: string; lines: { added: number; deleted: number } }>();
 
 /** Run `git status --porcelain` and `git diff HEAD --numstat` asynchronously
@@ -237,29 +270,45 @@ function parseGitDiffNumstat(out: string): { added: number; deleted: number } {
   return { added, deleted };
 }
 
-/** Count first-column chars → `3M2A1D`; empty string if no changes. */
+/** Parse `git status --porcelain` → space-separated `M5 A20 D13 ?5`; empty string if clean.
+ *
+ * Uses a single-pass per-file hierarchy:
+ *   1. ?? (untracked)           → other (?)
+ *   2. D in either column       → deleted (D)
+ *   3. A in staged column       → added (A)
+ *   4. M in either column       → modified (M)
+ *   5. Other non-space states    → other (?)
+ *
+ * This avoids the double-counting bug of the previous implementation
+ * which counted ` M` (unstaged modification) twice. */
 function parseGitStatusPorcelain(out: string): string {
   if (!out.trim()) return "";
-  let m = 0, a = 0, d = 0, other = 0;
+  let modified = 0, added = 0, deleted = 0, other = 0;
   for (const line of out.split("\n")) {
     if (!line) continue;
-    const c = line[0];
-    if (c === "M" || c === " ") m++;   // M column: modified; space but second column M also counts
-    else if (c === "A") a++;
-    else if (c === "D") d++;
-    else other++;
-    // Also count second-column D/M/A, merged vs HEAD.
-    const c2 = line[1];
-    if (c2 === "M" && c !== "M") m++;
-    else if (c2 === "A" && c !== "A") a++;
-    else if (c2 === "D" && c !== "D") d++;
+    const staged = line[0];   // index/staging status
+    const worktree = line[1]; // work tree status
+
+    // Untracked
+    if (staged === "?" && worktree === "?") { other++; continue; }
+    // Ignored — skip entirely
+    if (staged === "!" && worktree === "!") continue;
+    // Deleted (either staged or in worktree)
+    if (staged === "D" || worktree === "D") { deleted++; continue; }
+    // Added (staged as new file)
+    if (staged === "A") { added++; continue; }
+    // Modified (either column)
+    if (staged === "M" || worktree === "M") { modified++; continue; }
+    // Renamed, copied, unmerged, etc.
+    if (staged !== " " || worktree !== " ") { other++; continue; }
   }
+
   const parts: string[] = [];
-  if (m) parts.push(`${m}M`);
-  if (a) parts.push(`${a}A`);
-  if (d) parts.push(`${d}D`);
-  if (other) parts.push(`${other}?`);
-  return parts.join("");
+  if (modified) parts.push(`M${modified}`);
+  if (added) parts.push(`A${added}`);
+  if (deleted) parts.push(`D${deleted}`);
+  if (other) parts.push(`?${other}`);
+  return parts.join(" ");
 }
 
 /* ───────── TTFT/TPS tracker (ported from pi-statusbar) ───────── */
@@ -550,6 +599,17 @@ export default function (pi: ExtensionAPI) {
             contextSeg = "—";
           }
 
+          // cache hit rate
+          const cache = sessionCacheFromBranch(ctx.sessionManager.getBranch());
+          let cacheSeg: string;
+          if (cache) {
+            const pct = `${(cache.rate * 100).toFixed(0)}%`;
+            const label = `Cache ${pct}`;
+            cacheSeg = `${cacheRateColor(cache.rate)}${label}${RESET}`;
+          } else {
+            cacheSeg = `${cacheRateColor(0)}Cache —${RESET}`;
+          }
+
           // ttft + tps
           const ttft = tracker.ttft;
           const ttftStr = ttft != null
@@ -569,7 +629,7 @@ export default function (pi: ExtensionAPI) {
 
           // Line 2 priority: model > thinking (already part of model segment) >
           //   context > ttft > tps > cost
-          const line2Segs = [modelSeg, contextSeg, ttftSeg, tpsSeg, costSeg];
+          const line2Segs = [modelSeg, contextSeg, cacheSeg, ttftSeg, tpsSeg, costSeg];
           const line2 = composeLine(line2Segs, width);
 
           cachedLines = [line1, line2];
