@@ -27,6 +27,7 @@ set nrformats+=alpha                    " allow <C-a>/<C-x> on letters
 set expandtab                           " use spaces instead of tabs
 set autoindent                          " copy indent from current line
 set smartindent                         " smart auto-indent for C-like syntax
+set infercase                          " case-insensitive completion, respect case of typed word
 
 set tabstop=4                           " display tabs as 4 spaces
 set shiftwidth=0                        " use tabstop value for shifting
@@ -40,7 +41,8 @@ set ignorecase                          " case-insensitive search
 set smartcase                           " case-sensitive if uppercase present
 set incsearch                           " incremental search (live highlighting)
 set hlsearch                            " highlight all search matches
-nnoremap <c-n> <cmd>nohlsearch<cr>      " clear search highlighting
+" clear search highlighting
+nnoremap <c-n> <cmd>nohlsearch<cr>
 " }}}
 
 " disable keybindings {{{
@@ -62,37 +64,52 @@ xnoremap q <nop>
 " }}}
 
 " buffer {{{
-nnoremap [b <cmd>bprevious<cr>          " previous buffer
-nnoremap ]b <cmd>bnext<cr>              " next buffer
-nnoremap <leader>x <cmd>bufdo bw<cr>    " close all buffers
- " close current buffer and switch to next
+" previous buffer
+nnoremap [b <cmd>bprevious<cr>
+" next buffer
+nnoremap ]b <cmd>bnext<cr>
+" close all buffers
+nnoremap <leader>x <cmd>bufdo bw<cr>
+" close current buffer and switch to next
 nnoremap <s-x> <cmd>try <bar> bn <bar> bd # <bar> catch <bar> enew <bar> endtry <cr>
-nnoremap <leader>z `.                   " jump to last change position
+" jump to last change position
+nnoremap <leader>a `.
 " }}}
 
 " window {{{
-nnoremap <c-h> <c-w>h                   " move to left window
-nnoremap <c-l> <c-w>l                   " move to right window
-nnoremap <c-j> <c-w>j                   " move to window below
-nnoremap <c-k> <c-w>k                   " move to window above
+" move to left window
+nnoremap <c-h> <c-w>h
+" move to right window
+nnoremap <c-l> <c-w>l
+" move to window below
+nnoremap <c-j> <c-w>j
+" move to window above
+nnoremap <c-k> <c-w>k
 " }}}
 
 " split {{{
 set splitbelow                          " horizontal split puts new window below
 set splitright                          " vertical split puts new window to the right
-nnoremap <leader>\ <cmd>split<cr>       " horizontal split
-nnoremap <leader>\| <cmd>vsplit<cr>     " vertical split
+" horizontal split
+nnoremap <leader>\ <cmd>split<cr>
+" vertical split
+noremap <leader>\| <cmd>vsplit<cr>
 " }}}
 
 " yank {{{
-nnoremap Y "+y                          " yank to system clipboard
-nnoremap YY "+yy                        " yank line to system clipboard
-xnoremap Y "+y                          " visual mode yank to system clipboard
+" yank to system clipboard
+nnoremap Y "+y
+" yank line to system clipboard
+nnoremap YY "+yy
+" visual mode yank to system clipboard
+xnoremap Y "+y
 " }}}
 
 " new line {{{
-nnoremap o o<esc>                       " insert new line below, stay normal mode
-nnoremap O O<esc>                       " insert new line above, stay normal mode
+" insert new line below, stay normal mode
+nnoremap o o<esc>
+" insert new line above, stay normal mode
+nnoremap O O<esc>
 " }}}
 
 " display move {{{
@@ -101,33 +118,46 @@ nnoremap O O<esc>                       " insert new line above, stay normal mod
 " }}}
 
 " indent {{{
-xnoremap < <gv                          " indent left and keep selection
-xnoremap > >gv                          " indent right and keep selection
+" indent left and keep selection
+xnoremap < <gv
+" indent right and keep selection
+xnoremap > >gv
 " }}}
 
-" completion & fold & formatoptions (shared with Neovim) {{{
-" 'complete': sources insert-mode completion draws from, in priority order.
-" a '^N' suffix limits that source to N matches. See :help 'complete'.
+" completion & fold & formatoptions {{{
+
+" complete: sources for insert-mode completion
+"   .  = current buffer
+"   w  = buffers from other windows (^5 = scan up to 5)
+"   b  = other loaded buffers (^5)
+"   u  = unloaded buffers (^5)
+"   t  = tags
+"   i  = current / included files
 set complete=.,w^5,b^5,u^5,t,i
 
-" 'completeopt': always show menu, don't pre-select first item.
-" (Neovim's autocomplete auto-enables 'noselect'; the 'popup' flag for
-" docs-in-popup-window is Neovim-only and is added separately in nvim.)
-set completeopt=menuone,noselect
+" completeopt: behaviour of the completion popup menu
+"   menuone   = always show popup even for single match
+"   popup     = show preview info in a popup window (Neovim)
+"   preview   = show preview in the preview window
+"   preinsert = auto-select first match without <CR>
+set completeopt=menuone,popup,preview,preinsert
+
+" autocomplete: enables automatic keyword/completion suggestions while typing
+set autocomplete
+
+" <Tab> in insert mode: accept the selected completion if popup
+" is visible, otherwise insert a literal tab
+inoremap <expr> <tab> pumvisible() ? "\<c-y>" : "\<tab>"
 
 " Folds: keep disabled by default (Neovim sets tree-sitter foldexpr
 " separately; Vim defaults to manual folding, which is also off).
 set nofoldenable
 
-" 'formatoptions' is buffer-local and gets reset by filetype plugins on
-" FileType/BufEnter, so re-apply it in an autocmd instead of once at startup.
-" Flags: t auto-wrap text, c auto-wrap comments, q allow gq on comments,
-" n recognize numbered lists, l don't break long lines in insert mode,
-" j remove comment leader when joining with J.
-augroup formatoptions
-    autocmd!
-    autocmd FileType,BufEnter * if &buftype == '' | setlocal formatoptions=tcqnlj | endif
-augroup END
+" disable automatic comment continuation: r(Enter)/o(oO)/c(auto-wrap)
+set formatoptions-=cro
+
+" filetype plugins often re-set formatoptions, reapply on each FileType
+autocmd FileType * set formatoptions-=cro
 " }}}
 
 " colorscheme {{{
@@ -136,6 +166,11 @@ if has('termguicolors')
 endif
 colorscheme default                     " set colorscheme to default
 set background=dark                     " use dark background theme
+
+autocmd VimEnter * highlight Normal guibg=NONE
+if has('nvim')
+  autocmd VimEnter * highlight NormalFloat guibg=NONE
+endif
 " }}}
 
 " terminal {{{
@@ -150,13 +185,6 @@ autocmd BufReadPost *
   \ if line("'\"") > 0 && line("'\"") <= line("$") |
   \   execute "normal! g`\"" |
   \ endif
-" }}}
-
-" fix Normal background (Neovim 0.12 overrides it) {{{
-autocmd VimEnter * highlight Normal guibg=NONE
-if has('nvim')
-  autocmd VimEnter * highlight NormalFloat guibg=NONE
-endif
 " }}}
 
 " vim: foldmethod=marker

@@ -73,6 +73,9 @@ autoload -z edit-command-line
 zle -N edit-command-line
 bindkey "^G" edit-command-line
 
+# mandoc
+export MANPAGER='nvim +Man!'
+
 # aliases
 try_source ~/.aliases
 
