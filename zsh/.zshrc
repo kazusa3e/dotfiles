@@ -40,7 +40,8 @@ elif is_darwin; then
 fi
 
 # local bin
-export PATH="$HOME/.local/bin:$PATH"
+typeset -U path
+path=($HOME/.local/bin $path)
 
 # pipenv
 export PIP_REQUIRE_VIRTUALENV=true
@@ -63,7 +64,7 @@ setopt SHARE_HISTORY                    # share history across all sessions
 setopt INC_APPEND_HISTORY_TIME          # append history with timestamp
 
 # npm
-export PATH="$HOME/.local/share/npm-global/bin:$PATH"
+path=($HOME/.local/share/npm-global/bin $path)
 
 # podman
 export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
