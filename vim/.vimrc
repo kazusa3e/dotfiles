@@ -158,6 +158,12 @@ set formatoptions-=cro
 
 " filetype plugins often re-set formatoptions, reapply on each FileType
 autocmd FileType * set formatoptions-=cro
+
+" <leader>=: indent the whole buffer.
+nnoremap <leader>= mzgg=G`z
+
+" <leader>gq: format the whole buffer.
+nnoremap <leader>gq mzgggqG`z
 " }}}
 
 " colorscheme {{{
