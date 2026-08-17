@@ -41,7 +41,8 @@ Follow these steps:
 2. If the output is empty, **do nothing** and reply: "No staged changes. No action taken."
 3. If there are staged changes:
    a. Run `git diff --cached` to read the full diff and understand the changes.
-   b. If an argument was provided (i.e. `$@` is non-empty), use `$@` as the commit message.
-   c. If no argument was provided (`$@` is empty), generate a concise English commit message based on the diff content. Use the format `<type>(<scope>): <subject>` — note the single space after the colon — with one of the allowed types `feat`, `fix`, `refactor`, `docs`, `chore`, `perf`, `test`, `build`, `ci`, `style`, `revert`. Keep the subject under 72 characters.
-   d. Run git commit with the message. If it is a single-line subject, use `git commit -m "<message>"`. If it includes a body, pass each line via separate `-m` flags, matching the multi-line demo above.
-   e. Report the final commit message to the user.
+   b. If the staged changes contain multiple logically independent changes (e.g. a bug fix plus an unrelated refactor, or changes to clearly separate areas), **split them into multiple commits** instead of one: `git reset` to unstage everything (working tree changes are preserved), then for each logical group stage only its files with `git add <paths>`, run `git diff --cached` to confirm that group, and commit it with its own message per the rules in step 3d. Repeat until all changes are committed. Do not split when the changes form one coherent unit or when a single message was provided.
+   c. If an argument was provided (i.e. `$@` is non-empty), use `$@` as the commit message and do not split — commit everything in one commit.
+   d. If no argument was provided, generate a concise English commit message based on the diff content (for each commit when splitting per step 3b). Use the format `<type>(<scope>): <subject>` — note the single space after the colon — with one of the allowed types `feat`, `fix`, `refactor`, `docs`, `chore`, `perf`, `test`, `build`, `ci`, `style`, `revert`. Keep the subject under 72 characters.
+   e. Run git commit with the message. If it is a single-line subject, use `git commit -m "<message>"`. If it includes a body, pass each line via separate `-m` flags, matching the multi-line demo above.
+   f. Report the commit message(s) to the user.
