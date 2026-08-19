@@ -138,16 +138,35 @@ set complete=.,w^5,b^5,u^5,t,i
 " completeopt: behaviour of the completion popup menu
 "   menuone   = always show popup even for single match
 "   popup     = show preview info in a popup window (Neovim)
-"   preview   = show preview in the preview window
-"   preinsert = auto-select first match without <CR>
-set completeopt=menuone,popup,preview,preinsert
+"   preinsert = VSCode-style ghost: the first candidate is shown beyond the
+"               typed prefix (hl-PreInsert) but NOT committed; only <Tab>/<C-y>
+"               commits. Without it the first candidate is INSERTED into the
+"               buffer as you type, so typing 's' for 'std' yields 'std' and a
+"               following 'td' corrupts the word ('stdtd').
+" 'preinsert' is Neovim-only, so it is appended in lua/options.lua.
+" In plain Vim, 'autocomplete' auto-enables 'noselect' instead (nothing is
+" inserted until <C-y>/<Tab>), which gives the same "no premature commit"
+" safety.
+set completeopt=menuone,popup
 
 " autocomplete: enables automatic keyword/completion suggestions while typing
+" (plain Vim only; Neovim disables it globally in lua/options.lua and instead
+" turns it on per-buffer in lua/lsp.lua as a fallback for buffers without a
+" completion-capable LSP server; LSP buffers use vim.lsp.completion which
+" triggers on every word char)
 set autocomplete
 
 " <Tab> in insert mode: accept the selected completion if popup
 " is visible, otherwise insert a literal tab
 inoremap <expr> <tab> pumvisible() ? "\<c-y>" : "\<tab>"
+
+" <Enter> never accepts a completion: cancel the popup first, then newline.
+" (Without this, plain Vim commits a menu item once it was navigated to.)
+inoremap <expr> <cr> pumvisible() ? "\<c-e>\<cr>" : "\<cr>"
+
+" <Esc>: revert any completion text/ghost before leaving insert mode, so no
+" half-typed candidate lingers in the buffer.
+inoremap <expr> <esc> pumvisible() ? "\<c-e>\<esc>" : "\<esc>"
 
 " Folds: keep disabled by default (Neovim sets tree-sitter foldexpr
 " separately; Vim defaults to manual folding, which is also off).
