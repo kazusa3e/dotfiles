@@ -4,6 +4,8 @@ cmd.mk
 .local/
 .vscode/
 
+.envrc
+
 .clangd
 .cache/
 compile_commands.json
