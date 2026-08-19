@@ -82,3 +82,6 @@ try_source ~/.aliases
 
 # local config
 try_source ~/.zshrc.local
+
+# envrc
+try_eval direnv hook zsh
