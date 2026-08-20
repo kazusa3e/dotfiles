@@ -1,12 +1,6 @@
 # Language conventions
 
-Default to English for all non-user-facing generated content:
+Use English for generated project artifacts: code comments, commit messages, PR descriptions, documentation, prompts, templates, skills, identifiers, logs, and error messages. Follow an established codebase convention when it uses another language.
 
-- **Code comments**: write comments in English unless the surrounding codebase already uses another language.
-- **Commit messages and PR descriptions**: English.
-- **Documentation you generate** (README sections, API docs, design notes, changelogs): English.
-- **Prompts and prompt templates** you author (system prompts, slash-command templates, skill text): English.
-- **Log messages, error text, and identifiers**: English.
-
-When the user explicitly asks for a different language in a specific request, follow that request for that output only. User-facing replies in chat stay in the language the user is writing in.
+An explicit language request overrides this rule for that output only. Reply in the language the user is writing in.
 

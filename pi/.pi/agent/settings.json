@@ -1,10 +1,9 @@
 {
-  "defaultThinkingLevel": "max",
+  "defaultThinkingLevel": "high",
   "packages": [
-    "npm:pi-lynx",
-    "npm:pi-mcp-adapter",
-    "npm:pi-claude-code-ui",
-    "npm:pi-ask-user"
+    "npm:pi-web-access",
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:pi-cc-extensions"
   ],
   "theme": "dark",
   "enableInstallTelemetry": false,
@@ -12,5 +11,14 @@
   "compaction": {
     "enabled": false
   },
-  "hideThinkingBlock": true
+  "hideThinkingBlock": true,
+  "showCacheMissNotices": true,
+  "markdown": {
+    "mermaid": "final"
+  },
+  "collapseChangelog": true,
+  "tuiMode": "fullscreen",
+  "fullscreenExitOutput": "resume-hint",
+  "fullscreenScrollbar": "hidden",
+  "lastChangelogVersion": "0.84.2"
 }

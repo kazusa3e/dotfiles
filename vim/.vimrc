@@ -176,7 +176,10 @@ set nofoldenable
 set formatoptions-=cro
 
 " filetype plugins often re-set formatoptions, reapply on each FileType
-autocmd FileType * set formatoptions-=cro
+augroup SharedFormatOptions
+  autocmd!
+  autocmd FileType * set formatoptions-=cro
+augroup END
 
 " <leader>=: indent the whole buffer.
 nnoremap <leader>= mzgg=G`z
@@ -189,27 +192,36 @@ nnoremap <leader>gq mzgggqG`z
 if has('termguicolors')
     set termguicolors                   " enable true color support
 endif
-colorscheme default                     " set colorscheme to default
 set background=dark                     " use dark background theme
+colorscheme default                     " set colorscheme to default
 
-autocmd VimEnter * highlight Normal guibg=NONE
+augroup SharedAppearance
+  autocmd!
+  autocmd VimEnter * highlight Normal guibg=NONE
 if has('nvim')
   autocmd VimEnter * highlight NormalFloat guibg=NONE
 endif
+augroup END
 " }}}
 
 " terminal {{{
 if exists("##TermOpen")
-    autocmd TermOpen * setlocal nonumber    " hide line numbers in terminal
-    autocmd TermOpen * startinsert          " enter insert mode when opening terminal
+    augroup SharedTerminal
+      autocmd!
+      autocmd TermOpen * setlocal nonumber    " hide line numbers in terminal
+      autocmd TermOpen * startinsert          " enter insert mode when opening terminal
+    augroup END
 endif
 " }}}
 
 " restore cursor position {{{
-autocmd BufReadPost *
-  \ if line("'\"") > 0 && line("'\"") <= line("$") |
-  \   execute "normal! g`\"" |
-  \ endif
+augroup SharedRestoreCursor
+  autocmd!
+  autocmd BufReadPost *
+    \ if line("'\"") > 0 && line("'\"") <= line("$") |
+    \   execute "normal! g`\"" |
+    \ endif
+augroup END
 " }}}
 
 " vim: foldmethod=marker

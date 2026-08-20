@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  tmux-pane list
+  tmux-pane capture <pane-id-or-index> [start-line [end-line]]
+  tmux-pane send --user-requested <pane-id-or-index> <literal-text>
+  tmux-pane run  --user-requested <pane-id-or-index> <shell-command>
+  tmux-pane key  --user-requested <pane-id-or-index> <tmux-key>...
+EOF
+}
+
+fail() {
+  printf 'tmux-pane: %s\n' "$*" >&2
+  exit 1
+}
+
+command -v tmux >/dev/null 2>&1 || fail "tmux is not installed"
+[[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]] || fail "not running inside tmux"
+
+current_pane=$TMUX_PANE
+current_window=$(tmux display-message -p -t "$current_pane" '#{window_id}')
+[[ -n "$current_window" ]] || fail "cannot determine the current tmux window"
+
+resolve_target() {
+  local requested=${1:-}
+  local pane_id pane_index match=
+
+  [[ -n "$requested" ]] || fail "a target pane is required"
+
+  while read -r pane_id pane_index; do
+    if [[ "$requested" == "$pane_id" || "$requested" == "$pane_index" ]]; then
+      [[ -z "$match" ]] || fail "ambiguous pane target: $requested"
+      match=$pane_id
+    fi
+  done < <(tmux list-panes -t "$current_window" -F '#{pane_id} #{pane_index}')
+
+  [[ -n "$match" ]] || fail "pane $requested is not in the current window"
+  [[ "$match" != "$current_pane" ]] || fail "the agent's own pane cannot be targeted"
+  printf '%s\n' "$match"
+}
+
+require_user_request() {
+  [[ "${1:-}" == "--user-requested" ]] || fail "input requires --user-requested after an explicit user request"
+}
+
+operation=${1:-}
+case "$operation" in
+  list)
+    [[ $# -eq 1 ]] || fail "list takes no arguments"
+    found=false
+    while IFS=$'\t' read -r pane_id pane_index active size command title; do
+      [[ "$pane_id" == "$current_pane" ]] && continue
+      found=true
+      printf '%s\tindex=%s\tactive=%s\tsize=%s\tcommand=%s\ttitle=%s\n' \
+        "$pane_id" "$pane_index" "$active" "$size" "$command" "$title"
+    done < <(tmux list-panes -t "$current_window" -F $'#{pane_id}\t#{pane_index}\t#{pane_active}\t#{pane_width}x#{pane_height}\t#{pane_current_command}\t#{pane_title}')
+    $found || fail "the current window has no other panes"
+    ;;
+
+  capture)
+    [[ $# -ge 2 && $# -le 4 ]] || fail "capture requires a pane and optional start/end lines"
+    target=$(resolve_target "$2")
+    start=${3:--}
+    if [[ $# -eq 4 ]]; then
+      tmux capture-pane -p -J -t "$target" -S "$start" -E "$4"
+    else
+      tmux capture-pane -p -J -t "$target" -S "$start"
+    fi
+    ;;
+
+  send)
+    [[ $# -ge 4 ]] || fail "send requires --user-requested, a pane, and literal text"
+    require_user_request "$2"
+    target=$(resolve_target "$3")
+    shift 3
+    tmux send-keys -t "$target" -l -- "$*"
+    ;;
+
+  run)
+    [[ $# -ge 4 ]] || fail "run requires --user-requested, a pane, and a command"
+    require_user_request "$2"
+    target=$(resolve_target "$3")
+    shift 3
+    tmux send-keys -t "$target" -l -- "$*"
+    tmux send-keys -t "$target" Enter
+    ;;
+
+  key)
+    [[ $# -ge 4 ]] || fail "key requires --user-requested, a pane, and at least one key"
+    require_user_request "$2"
+    target=$(resolve_target "$3")
+    shift 3
+    tmux send-keys -t "$target" "$@"
+    ;;
+
+  -h|--help|help)
+    usage
+    ;;
+
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
