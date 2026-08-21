@@ -17,7 +17,7 @@
     "mermaid": "final"
   },
   "collapseChangelog": true,
-  "tuiMode": "fullscreen",
+  "tuiMode": "regular",
   "fullscreenExitOutput": "resume-hint",
   "fullscreenScrollbar": "hidden",
   "lastChangelogVersion": "0.84.2"

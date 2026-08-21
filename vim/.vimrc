@@ -117,59 +117,21 @@ nnoremap O O<esc>
 " nnoremap k gk                           " move up by display line (for wrapped lines)
 " }}}
 
-" indent {{{
+" indent & format {{{
+
 " indent left and keep selection
 xnoremap < <gv
+
 " indent right and keep selection
 xnoremap > >gv
-" }}}
 
-" completion & fold & formatoptions {{{
+" indent the whole buffer.
+nnoremap <leader>= mzgg=G`z
 
-" complete: sources for insert-mode completion
-"   .  = current buffer
-"   w  = buffers from other windows (^5 = scan up to 5)
-"   b  = other loaded buffers (^5)
-"   u  = unloaded buffers (^5)
-"   t  = tags
-"   i  = current / included files
-set complete=.,w^5,b^5,u^5,t,i
+" format the whole buffer.
+nnoremap <leader>gq mzgggqG`z
 
-" completeopt: behaviour of the completion popup menu
-"   menuone   = always show popup even for single match
-"   popup     = show preview info in a popup window (Neovim)
-"   preinsert = VSCode-style ghost: the first candidate is shown beyond the
-"               typed prefix (hl-PreInsert) but NOT committed; only <Tab>/<C-y>
-"               commits. Without it the first candidate is INSERTED into the
-"               buffer as you type, so typing 's' for 'std' yields 'std' and a
-"               following 'td' corrupts the word ('stdtd').
-" 'preinsert' is Neovim-only, so it is appended in lua/options.lua.
-" In plain Vim, 'autocomplete' auto-enables 'noselect' instead (nothing is
-" inserted until <C-y>/<Tab>), which gives the same "no premature commit"
-" safety.
-set completeopt=menuone,popup
-
-" autocomplete: enables automatic keyword/completion suggestions while typing
-" (plain Vim only; Neovim disables it globally in lua/options.lua and instead
-" turns it on per-buffer in lua/lsp.lua as a fallback for buffers without a
-" completion-capable LSP server; LSP buffers use vim.lsp.completion which
-" triggers on every word char)
-set autocomplete
-
-" <Tab> in insert mode: accept the selected completion if popup
-" is visible, otherwise insert a literal tab
-inoremap <expr> <tab> pumvisible() ? "\<c-y>" : "\<tab>"
-
-" <Enter> never accepts a completion: cancel the popup first, then newline.
-" (Without this, plain Vim commits a menu item once it was navigated to.)
-inoremap <expr> <cr> pumvisible() ? "\<c-e>\<cr>" : "\<cr>"
-
-" <Esc>: revert any completion text/ghost before leaving insert mode, so no
-" half-typed candidate lingers in the buffer.
-inoremap <expr> <esc> pumvisible() ? "\<c-e>\<esc>" : "\<esc>"
-
-" Folds: keep disabled by default (Neovim sets tree-sitter foldexpr
-" separately; Vim defaults to manual folding, which is also off).
+" keep fold disabled by default.
 set nofoldenable
 
 " disable automatic comment continuation: r(Enter)/o(oO)/c(auto-wrap)
@@ -180,12 +142,33 @@ augroup SharedFormatOptions
   autocmd!
   autocmd FileType * set formatoptions-=cro
 augroup END
+" }}}
 
-" <leader>=: indent the whole buffer.
-nnoremap <leader>= mzgg=G`z
+" completion {{{
 
-" <leader>gq: format the whole buffer.
-nnoremap <leader>gq mzgggqG`z
+" Plain Vim completion; Neovim uses blink.cmp.
+if !has('nvim')
+  " complete: sources for insert-mode completion
+  "   .  = current buffer
+  "   w  = buffers from other windows (^5 = scan up to 5)
+  "   b  = other loaded buffers (^5)
+  "   u  = unloaded buffers (^5)
+  "   t  = tags
+  "   i  = current / included files
+  set complete=.,w^5,b^5,u^5,t,i
+
+  " completeopt: behavior of the completion popup
+  "   menuone = show the menu even for one match
+  "   popup   = show item information in a popup
+  set completeopt=menuone,popup
+  set autocomplete
+
+  " Tab accepts; Enter and Esc cancel the current suggestion.
+  inoremap <expr> <tab> pumvisible() ? "\<c-y>" : "\<tab>"
+  inoremap <expr> <cr> pumvisible() ? "\<c-e>\<cr>" : "\<cr>"
+  inoremap <expr> <esc> pumvisible() ? "\<c-e>\<esc>" : "\<esc>"
+endif
+
 " }}}
 
 " colorscheme {{{
