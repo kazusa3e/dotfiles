@@ -20,5 +20,8 @@
   "tuiMode": "regular",
   "fullscreenExitOutput": "resume-hint",
   "fullscreenScrollbar": "hidden",
-  "lastChangelogVersion": "0.84.2"
+  "lastChangelogVersion": "0.84.2",
+  "skills": [
+    "-skills/minimal-subagent/SKILL.md"
+  ]
 }

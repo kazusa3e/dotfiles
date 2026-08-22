@@ -70,8 +70,8 @@ nnoremap [b <cmd>bprevious<cr>
 nnoremap ]b <cmd>bnext<cr>
 " close all buffers
 nnoremap <leader>x <cmd>bufdo bw<cr>
-" close current buffer and switch to next
-nnoremap <s-x> <cmd>try <bar> bn <bar> bd # <bar> catch <bar> enew <bar> endtry <cr>
+" close current buffer
+nnoremap <s-x> <cmd>bd<cr>
 " jump to last change position
 nnoremap <leader>a `.
 " }}}
