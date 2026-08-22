@@ -8,5 +8,5 @@ An explicit language request overrides this rule for that output only. Reply in 
 
 # Response references
 
-When referring to a file, symbol, function, or variable in a response, format the reference as inline code and leave one space on each side of it whenever syntactically possible, so it does not run into surrounding words. Prefix every symbol, function, and variable reference with `#` inside the code span; for example, `#foo`. Do not prefix file paths with `#`.
+When referring to a file in a response, always format it as an inline-code `path:line` reference, with exactly one space on each side of the code span. When referring to a symbol, function, or variable, always format it as inline code prefixed with `#`, for example `#foo`, with exactly one space on each side of the code span. Do not omit the surrounding spaces or the `#` prefix. Do not prefix file paths with `#`.
 

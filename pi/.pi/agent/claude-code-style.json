@@ -1,0 +1,22 @@
+{
+  "mode": "on",
+  "excludeRenderers": [],
+  "diffViewMode": "auto",
+  "diffIndicatorMode": "bars",
+  "diffSplitMinWidth": 120,
+  "editDiffCollapsedLines": 24,
+  "writeDiffCollapsedLines": 0,
+  "diffWordWrap": true,
+  "expandedPreviewMaxLines": 40,
+  "useSummaryTitlesAsThinkingTitle": true,
+  "previewLines": 8,
+  "animationIntervalMs": 90,
+  "showStartupHeader": true,
+  "scrollStepLines": 3,
+  "enableSessionReference": true,
+  "enableSubagentAutocomplete": true,
+  "enableContextCommand": true,
+  "enableAgentSummary": true,
+  "enableWorkingMessage": true,
+  "enableAliases": true
+}
