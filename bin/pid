@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+engine=${PID_ENGINE:-podman}
+image=${PID_IMAGE:-pid}
+nix_volume=${PID_NIX_VOLUME:-pid-nix}
+mount_cwd=0
+after_separator=0
+engine_args=()
+pi_args=()
+
+usage() {
+    cat >&2 <<'EOF'
+Usage: pid [--cwd] [container arguments...] [--] [pi arguments...]
+
+Arguments before -- are passed to the container engine. This makes custom
+mounts and other runtime options possible. Arguments after -- are passed to
+pi. --cwd additionally mounts the current directory at the same path and uses
+it as the container working directory.
+
+The container provides nix-shell and uses a container-local Nix volume.
+
+Environment:
+  PID_ENGINE ENGINE          Container engine (default: podman)
+  PID_IMAGE IMAGE             Container image (default: pid)
+  PID_NIX_VOLUME VOLUME      Nix volume (default: pid-nix; empty disables it)
+EOF
+}
+
+while (($#)); do
+    if ((after_separator)); then
+        pi_args+=("$1")
+        shift
+        continue
+    fi
+
+    case "$1" in
+        --)
+            after_separator=1
+            shift
+            ;;
+        --cwd)
+            mount_cwd=1
+            shift
+            ;;
+        --engine)
+            (($# >= 2)) || { echo "pid: --engine requires a value" >&2; exit 2; }
+            engine=$2
+            shift 2
+            ;;
+        --image)
+            (($# >= 2)) || { echo "pid: --image requires a value" >&2; exit 2; }
+            image=$2
+            shift 2
+            ;;
+        --nix|--no-nix)
+            echo "pid: Nix is always enabled; remove $1" >&2
+            exit 2
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            engine_args+=("$1")
+            shift
+            ;;
+    esac
+done
+
+host_uid=$(id -u)
+host_gid=$(id -g)
+command -v "$engine" >/dev/null 2>&1 || {
+    echo "pid: container engine not found: $engine" >&2
+    exit 127
+}
+
+runtime_args=(run --rm -it)
+if [[ ${engine##*/} == podman ]]; then
+    runtime_args+=(--userns=keep-id)
+fi
+runtime_args+=(
+    --user "$host_uid:$host_gid"
+    --env "HOME=$HOME"
+    --workdir /workspace
+)
+
+if [[ -n "$nix_volume" ]]; then
+    nix_volume_mount="$nix_volume:/nix"
+    if [[ ${engine##*/} == podman ]]; then
+        nix_volume_mount+=:U
+    fi
+    runtime_args+=(--volume "$nix_volume_mount")
+fi
+if [[ -f "$HOME/.gitconfig" ]]; then
+    runtime_args+=(--volume "$HOME/.gitconfig:$HOME/.gitconfig:ro")
+fi
+if [[ -d "$HOME/.pi" ]]; then
+    runtime_args+=(--volume "$HOME/.pi:$HOME/.pi:rw")
+fi
+if [[ -d "$HOME/.agents" ]]; then
+    runtime_args+=(--volume "$HOME/.agents:$HOME/.agents:ro")
+fi
+
+if ((mount_cwd)); then
+    runtime_args+=(--volume "$PWD:$PWD:rw" --workdir "$PWD")
+fi
+
+container_name="${image}-${PWD##*/}-$(date +%d_%H%M)"
+runtime_args+=(--name "$container_name")
+
+exec "$engine" "${runtime_args[@]}" "${engine_args[@]}" "$image" "${pi_args[@]}"

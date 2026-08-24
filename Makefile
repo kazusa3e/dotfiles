@@ -1,8 +1,8 @@
 os := $(shell uname -s)
 tmux_plugin_dir := ~/.tmux/plugins
-
 # app := zsh vim tmux starship git clangd lazygit alacritty yazi npm claude ccstatusline opencode
 app := zsh vim tmux starship git npm pi
+binaries := pid
 
 ifeq ($(os),Darwin)
 	app += karabiner hammerspoon wezterm
@@ -21,7 +21,11 @@ install:
 	[ -d $(tmux_plugin_dir)/tmux-resurrect ] || git clone --depth 1 https://github.com/tmux-plugins/tmux-resurrect.git $(tmux_plugin_dir)/tmux-resurrect
 	[ -d $(tmux_plugin_dir)/tmux-continuum ] || git clone --depth 1 https://github.com/tmux-plugins/tmux-continuum.git $(tmux_plugin_dir)/tmux-continuum
 
-	-fd . bin/ -0 | xargs -I{} --null sh -c 'ln -s "$$(pwd)/{}" "$$HOME/.local/bin/$$(basename {})"'
+	mkdir -p ~/.local/bin
+	for binary in $(binaries); do \
+		test -f "bin/$$binary" || { echo "Unknown binary: $$binary" >&2; exit 1; }; \
+		ln -sfn "$(CURDIR)/bin/$$binary" "$$HOME/.local/bin/$$binary"; \
+	done
 
 	if [ "$(os)" = "Darwin" ]; then \
 		goku; \
@@ -32,5 +36,7 @@ install:
 uninstall:
 	stow -t ~ --delete $(app)
 
-	-rm -rf $(tmux_plugin_dir)
-	-fd . bin/ -0 | xargs -I{} --null sh -c 'rm "$$HOME/.local/bin/$$(basename {})"'
+	-$(RM) -r $(tmux_plugin_dir)
+	for binary in $(binaries); do \
+		$(RM) "$$HOME/.local/bin/$$binary"; \
+	done

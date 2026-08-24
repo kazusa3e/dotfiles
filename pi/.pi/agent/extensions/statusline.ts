@@ -1,8 +1,8 @@
 /**
  * statusline — two-line custom footer, replaces pi-statusbar.
  *
- * Line 1 (identity / repo):   🐳/🏠 <pwd> · <git-branch> <git-diff>
- * Line 2 (model / perf):      <model-id> <thinking> · <context> · TTFT <ttft>s · <tps> TPS · <cost>
+ * Line 1 (session / repo):    Session: <title> · 🐳/🏠 <pwd> · <git-branch> <git-diff>
+ * Line 2 (model / perf):      <provider>/<model-id> <thinking> · <context> · TTFT <ttft>s · <tps> TPS · <cost>
  *
  * Design:
  *   - Single self-contained file, no import from pi-statusbar internals.
@@ -26,28 +26,13 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 const RESET = "\x1b[0m";
 const SEP_COLOR = "\x1b[38;2;140;140;140m"; // grey, separator
 const C_PWD = "\x1b[38;2;255;165;0m";        // orange
-const C_MODEL = "\x1b[38;2;80;180;255m";     // blue
+const C_SESSION = "\x1b[38;2;180;140;255m";   // violet
+const C_MODEL = "\x1b[38;2;80;180;255m";      // blue
 const C_GIT_BRANCH = "\x1b[38;2;86;182;194m"; // cyan #56B6C2
-const C_GIT_DIFF = "\x1b[38;2;140;140;140m"; // grey
+const C_GIT_DIFF = "\x1b[38;2;140;140;140m";  // grey
 
 function rgb(r: number, g: number, b: number): string {
   return `\x1b[38;2;${r};${g};${b}m`;
-}
-
-/** HSL → RGB, same as pi-statusbar. */
-function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
-  h = ((h % 360) + 360) % 360;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-  const m = l - c / 2;
-  let r1 = 0, g1 = 0, b1 = 0;
-  if (h < 60) { r1 = c; g1 = x; }
-  else if (h < 120) { r1 = x; g1 = c; }
-  else if (h < 180) { g1 = c; b1 = x; }
-  else if (h < 240) { g1 = x; b1 = c; }
-  else if (h < 300) { r1 = x; b1 = c; }
-  else { r1 = c; g1 = x; }
-  return { r: Math.round((r1 + m) * 255), g: Math.round((g1 + m) * 255), b: Math.round((b1 + m) * 255) };
 }
 
 /* TTFT color: <2s green / 2-3 yellow / 3-4 orange / 4-5 red / ≥5 purple. */
@@ -99,18 +84,27 @@ function thinkingColor(level: string): string {
 
 /* ───────── Text helpers ───────── */
 
-function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex
-  return s.replace(/\x1b\[[0-9;]*m/g, "");
-}
-
 function middleTruncate(s: string, width: number): string {
-  if (width <= 1) return s.slice(0, Math.max(0, width));
-  if (s.length <= width) return s;
+  if (width <= 0) return "";
+  if (visibleWidth(s) <= width) return s;
+  if (width === 1) return "…";
+
+  const chars = Array.from(s);
+  const take = (start: number, step: 1 | -1, budget: number) => {
+    let text = "";
+    let used = 0;
+    for (let i = start; i >= 0 && i < chars.length; i += step) {
+      const char = chars[i]!;
+      const charWidth = visibleWidth(char);
+      if (used + charWidth > budget) break;
+      text = step === 1 ? text + char : char + text;
+      used += charWidth;
+    }
+    return text;
+  };
+
   const keep = width - 1;
-  const head = Math.ceil(keep / 2);
-  const tail = Math.floor(keep / 2);
-  return s.slice(0, head) + "…" + s.slice(s.length - tail);
+  return take(0, 1, Math.ceil(keep / 2)) + "…" + take(chars.length - 1, -1, Math.floor(keep / 2));
 }
 
 /* Replace $HOME with ~, then middle-truncate when wider than maxWidth. */
@@ -155,7 +149,7 @@ function sessionCostFromBranch(branch: readonly unknown[]): number {
     const rec = entry as Record<string, unknown>;
     if (rec.type !== "message") continue;
     const message = rec.message as Record<string, unknown> | undefined;
-    if (!message || message.role !== "assistant") continue;
+    if (!message) continue;
     const usage = message.usage as { cost?: { total?: number } } | undefined;
     const cost = usage?.cost?.total;
     if (typeof cost === "number" && Number.isFinite(cost)) total += cost;
@@ -175,7 +169,7 @@ function sessionCacheFromBranch(branch: readonly unknown[]):
     const rec = entry as Record<string, unknown>;
     if (rec.type !== "message") continue;
     const message = rec.message as Record<string, unknown> | undefined;
-    if (!message || message.role !== "assistant") continue;
+    if (!message) continue;
     const usage = message.usage as
       { input?: number; cacheRead?: number; cacheWrite?: number } | undefined;
     if (!usage) continue;
@@ -215,43 +209,65 @@ const ENV_ICON_WIDTH = 3;
 
 /* ───────── git status cache ───────── */
 
-type GitCache = {
-  branch: string | null;
-  diff: string | null;
-  lines: { added: number; deleted: number } | null;
+type GitDiff = {
+  diff: string;
+  lines: { added: number; deleted: number };
 };
 
-let gitCache: GitCache = { branch: null, diff: null, lines: null };
-let gitInFlight = false;
-// cwd -> { diff: "M3 A2 D1", lines: { added, deleted } }
-const gitDiffCache = new Map<string, { diff: string; lines: { added: number; deleted: number } }>();
+type GitRefresh = {
+  callbacks: Set<() => void>;
+  inFlight: boolean;
+  pending: boolean;
+};
 
-/** Run `git status --porcelain` and `git diff HEAD --numstat` asynchronously
- * (one fork combined via `git -c ...`) and update the cache. Silently fails
- * (marks cwd as no-diff). */
+// cwd -> { diff: "M3 A2 D1", lines: { added, deleted } }
+const gitDiffCache = new Map<string, GitDiff>();
+const gitRefreshes = new Map<string, GitRefresh>();
+
+/** Refresh a cwd's git cache. Concurrent requests are coalesced, then rerun
+ * once when changes arrive during the in-flight request. */
 function refreshGitDiff(cwd: string, onUpdate: () => void): void {
-  if (gitInFlight) return;
-  gitInFlight = true;
+  let refresh = gitRefreshes.get(cwd);
+  if (!refresh) {
+    refresh = { callbacks: new Set(), inFlight: false, pending: false };
+    gitRefreshes.set(cwd, refresh);
+  }
+  refresh.callbacks.add(onUpdate);
+  if (refresh.inFlight) {
+    refresh.pending = true;
+    return;
+  }
+  runGitRefresh(cwd, refresh);
+}
+
+function runGitRefresh(cwd: string, refresh: GitRefresh): void {
+  refresh.inFlight = true;
   execFile("git", ["status", "--porcelain"], { cwd }, (errStatus, statusOut) => {
     if (errStatus) {
-      gitInFlight = false;
-      // Silent failure: mark this cwd as no-diff.
-      gitDiffCache.set(cwd, { diff: "", lines: { added: 0, deleted: 0 } });
-      gitCache = { ...gitCache, diff: "", lines: { added: 0, deleted: 0 } };
-      onUpdate();
+      finishGitRefresh(cwd, refresh, { diff: "", lines: { added: 0, deleted: 0 } });
       return;
     }
-    // Second fork: line-level stats vs HEAD. Error here (e.g. empty repo with
-    // no HEAD) is non-fatal; we just keep zero line counts.
+    // Line-level stats against HEAD exclude untracked files. An empty repository
+    // has no HEAD, so failure here still leaves the file-status summary intact.
     execFile("git", ["diff", "HEAD", "--numstat"], { cwd }, (errNumstat, numstatOut) => {
-      gitInFlight = false;
-      const diff = parseGitStatusPorcelain(statusOut);
-      const lines = errNumstat ? { added: 0, deleted: 0 } : parseGitDiffNumstat(numstatOut);
-      gitDiffCache.set(cwd, { diff, lines });
-      gitCache = { ...gitCache, diff, lines };
-      onUpdate();
+      finishGitRefresh(cwd, refresh, {
+        diff: parseGitStatusPorcelain(statusOut),
+        lines: errNumstat ? { added: 0, deleted: 0 } : parseGitDiffNumstat(numstatOut),
+      });
     });
   });
+}
+
+function finishGitRefresh(cwd: string, refresh: GitRefresh, result: GitDiff): void {
+  gitDiffCache.set(cwd, result);
+  refresh.inFlight = false;
+  const callbacks = [...refresh.callbacks];
+  refresh.callbacks.clear();
+  const rerun = refresh.pending;
+  refresh.pending = false;
+  if (rerun) runGitRefresh(cwd, refresh);
+  else gitRefreshes.delete(cwd);
+  for (const callback of callbacks) callback();
 }
 
 /** Parse `git diff HEAD --numstat` → { added, deleted }, summing binary
@@ -318,7 +334,6 @@ class TokenRateTracker {
   private _lastCompletedRate = 0;
   private _lastCompletedTokenCount = 0;
   private _lastTTFT: number | null = null;
-  private _hasData = false;
   private _ttftSamples: number[] = [];
   private _tpsSamples: number[] = [];
   private _turnStartMs: number | null = null;
@@ -330,7 +345,6 @@ class TokenRateTracker {
   private _destroyed = false;
 
   get ttft(): number | null { return this._lastTTFT; }
-  get tps(): number { return this._lastCompletedRate; }
 
   liveTps(now: number = performance.now()): number {
     if (!this._isStreaming) return this._lastCompletedRate;
@@ -411,7 +425,6 @@ class TokenRateTracker {
       this._tpsSamples.push(callTps);
       this._lastCompletedRate = this._tpsSamples.reduce((s, v) => s + v, 0) / this._tpsSamples.length;
       this._lastCompletedTokenCount = turnTokens;
-      this._hasData = true;
     }
     this._firstDeltaMs = null;
     this._totalPauseMs = 0;
@@ -433,7 +446,6 @@ class TokenRateTracker {
     this._lastCompletedRate = 0;
     this._lastCompletedTokenCount = 0;
     this._lastTTFT = null;
-    this._hasData = false;
     this._ttftSamples = [];
     this._tpsSamples = [];
     this.cancel();
@@ -474,8 +486,8 @@ export default function (pi: ExtensionAPI) {
     let used = 0;
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i];
-      const segWidth = visibleWidth(stripAnsi(seg));
-      const need = segWidth + (i > 0 ? visibleWidth(stripAnsi(SEP)) : 0);
+      const segWidth = visibleWidth(seg);
+      const need = segWidth + (i > 0 ? visibleWidth(SEP) : 0);
       if (used + need > width && line.length > 0) break;
       line += (i > 0 ? SEP : "") + seg;
       used += need;
@@ -488,11 +500,13 @@ export default function (pi: ExtensionAPI) {
     refresh(true);
   });
   pi.on("thinking_level_select", async () => refresh(true));
+  pi.on("session_info_changed", async () => refresh(true));
   pi.on("turn_start", async () => {
     tracker.start(performance.now());
   });
-  pi.on("turn_end", async () => {
+  pi.on("turn_end", async (_event, ctx) => {
     tracker.cancel();
+    refreshGitDiff(ctx.cwd, () => refresh(true));
     refresh(true);
   });
   pi.on("tool_execution_start", async () => tracker.pauseForTool());
@@ -518,7 +532,6 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setFooter((tui, _theme, footerData) => {
       requestRender = () => tui.requestRender();
       const unsubBranch = footerData.onBranchChange(() => {
-        gitCache = { ...gitCache, branch: footerData.getGitBranch() };
         refreshGitDiff(ctx.cwd, () => refresh(true));
         refresh(true);
       });
@@ -530,7 +543,11 @@ export default function (pi: ExtensionAPI) {
           cachedLines = null;
           cachedWidth = -1;
         },
-        invalidate() {},
+        invalidate() {
+          needsRecompute = true;
+          cachedLines = null;
+          cachedWidth = -1;
+        },
         render(width: number): string[] {
           if (!needsRecompute && width === cachedWidth && cachedLines !== null) {
             return cachedLines.map((l) => truncateToWidth(l, width));
@@ -538,51 +555,44 @@ export default function (pi: ExtensionAPI) {
           needsRecompute = false;
           cachedWidth = width;
 
-          // Pull fresh data.
+          /* === Line 1: session · env + pwd · git-branch git-diff === */
           const cached = gitDiffCache.get(ctx.cwd);
-          gitCache = {
-            branch: footerData.getGitBranch(),
-            diff: cached?.diff ?? null,
-            lines: cached?.lines ?? null,
-          };
-
-          /* === Line 1: env + pwd · git-branch git-diff === */
-          // pwd width budget = total width - git segment(s) - separator. Reserve
-          // the emoji prefix first.
-          const branchText = gitCache.branch && gitCache.branch !== "detached"
-            ? gitCache.branch : (gitCache.branch === "detached" ? "detached" : null);
-          const diffText = gitCache.diff && gitCache.diff.length > 0 ? gitCache.diff : null;
-          const lines = gitCache.lines;
+          const branch = footerData.getGitBranch();
+          const branchText = branch === "detached" ? "detached" : branch;
+          const diffText = cached?.diff || null;
+          const lines = cached?.lines ?? null;
           const linesText = lines && (lines.added > 0 || lines.deleted > 0)
             ? `+${lines.added}/-${lines.deleted}`
             : null;
 
           const gitSegs: string[] = [];
-          if (branchText) {
-            gitSegs.push(`${C_GIT_BRANCH}${branchText}${RESET}`);
-          }
-          if (diffText) {
-            gitSegs.push(`${C_GIT_DIFF}${diffText}${RESET}`);
-          }
-          if (linesText) {
-            gitSegs.push(`${C_GIT_DIFF}${linesText}${RESET}`);
-          }
-          // space, not separator, between branch and diff
+          if (branchText) gitSegs.push(`${C_GIT_BRANCH}${branchText}${RESET}`);
+          if (diffText) gitSegs.push(`${C_GIT_DIFF}${diffText}${RESET}`);
+          if (linesText) gitSegs.push(`${C_GIT_DIFF}${linesText}${RESET}`);
+          // Space, not separator, between branch and diff details.
           const gitCombined = gitSegs.join(" ");
-          const gitWidth = gitCombined ? visibleWidth(stripAnsi(gitCombined)) : 0;
-          const reserved = gitWidth > 0 ? visibleWidth(stripAnsi(SEP)) + gitWidth : 0;
-          const pwdMax = Math.max(8, width - reserved - ENV_ICON_WIDTH);
+
+          const sessionName = pi.getSessionName();
+          const sessionText = sessionName
+            ? truncateToWidth(`Session: ${sessionName}`, Math.max(0, Math.floor(width * 0.35)))
+            : null;
+          const sessionSeg = sessionText ? `${C_SESSION}${sessionText}${RESET}` : null;
+          const sessionWidth = sessionSeg ? visibleWidth(sessionSeg) : 0;
+          const gitWidth = gitCombined ? visibleWidth(gitCombined) : 0;
+          const separatorWidth = visibleWidth(SEP);
+          const reserved = (sessionSeg ? sessionWidth + separatorWidth : 0)
+            + (gitCombined ? gitWidth + separatorWidth : 0);
+          const pwdMax = Math.max(0, width - reserved - ENV_ICON_WIDTH);
           const pwdDisplay = formatCwd(ctx.cwd, homedir(), pwdMax);
           const pwdSeg = `${C_PWD}${ENV_ICON}${pwdDisplay}${RESET}`;
 
-          const line1Segs = [pwdSeg];
-          if (gitCombined) line1Segs.push(gitCombined);
+          const line1Segs = [sessionSeg, pwdSeg, gitCombined].filter((seg): seg is string => Boolean(seg));
           const line1 = composeLine(line1Segs, width);
 
-          /* === Line 2: model thinking · context · ttft · tps · cost === */
-          const modelId = ctx.model?.id ?? "no-model";
+          /* === Line 2: provider/model thinking · context · ttft · tps · cost === */
+          const modelLabel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "no-model";
           const effort = normalizeEffortLevel(String(pi.getThinkingLevel()));
-          const modelSeg = `${C_MODEL}${modelId}${RESET} ${thinkingColor(effort)}${effort}${RESET}`;
+          const modelSeg = `${C_MODEL}${modelLabel}${RESET} ${thinkingColor(effort)}${effort}${RESET}`;
 
           // context
           const usage = ctx.getContextUsage();

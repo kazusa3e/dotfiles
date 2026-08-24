@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+shell_quote() {
+    value=$1
+    quoted="'"
+    while [ "${value#*\'*}" != "$value" ]; do
+        prefix=${value%%\'*}
+        quoted=$quoted$prefix"'\\''"
+        value=${value#*\'}
+    done
+    printf '%s' "$quoted$value'"
+}
+
+pi_command='exec pi'
+for arg do
+    quoted_arg=$(shell_quote "$arg")
+    pi_command="$pi_command $quoted_arg"
+done
+
+if [ -f shell.nix ]; then
+    quoted_command=$(shell_quote "$pi_command")
+    pi_command="exec nix-shell shell.nix --run $quoted_command"
+fi
+
+exec nix-shell /etc/pid/pid-shell.nix --run "$pi_command"

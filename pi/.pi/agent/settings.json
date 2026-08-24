@@ -3,7 +3,9 @@
   "packages": [
     "npm:pi-web-access",
     "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:pi-cc-extensions"
+    "npm:pi-cc-extensions",
+    "npm:pi-autoname",
+    "npm:pi-hashline-edit"
   ],
   "theme": "dark",
   "enableInstallTelemetry": false,
