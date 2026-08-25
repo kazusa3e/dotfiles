@@ -52,7 +52,15 @@ RUN printf '%s:x:%s:%s::/home/%s:/bin/sh\n' \
 COPY pid-entrypoint /usr/local/bin/pid-entrypoint
 RUN chmod 0755 /usr/local/bin/pid-entrypoint
 
+RUN chown -R ${USER_UID}:${USER_GID} /nix
 USER ${USER_NAME}
+
+RUN nix-channel --add \
+    https://nixos.org/channels/nixos-${NIXPKGS_CHANNEL} nixpkgs \
+    && nix-channel --add \
+    https://nixos.org/channels/nixpkgs-${NIXPKGS_UNSTABLE_CHANNEL} unstable \
+    && nix-channel --update
+
 WORKDIR /workspace
 
 VOLUME ["/nix"]

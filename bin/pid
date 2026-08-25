@@ -87,9 +87,9 @@ runtime_args+=(
 
 if [[ -n "$nix_volume" ]]; then
     nix_volume_mount="$nix_volume:/nix"
-    if [[ ${engine##*/} == podman ]]; then
-        nix_volume_mount+=:U
-    fi
+    # if [[ ${engine##*/} == podman ]]; then
+    #     nix_volume_mount+=:U
+    # fi
     runtime_args+=(--volume "$nix_volume_mount")
 fi
 if [[ -f "$HOME/.gitconfig" ]]; then
