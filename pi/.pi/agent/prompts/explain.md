@@ -3,9 +3,9 @@ description: Explain a concept through its meaning, background, and trade-offs.
 argument-hint: "<topic or question>"
 ---
 
-Explain `$@` as a clear, self-contained teaching response.
+Topic: `${@:-NO_TOPIC}`.
 
-If no topic was provided, ask what the user wants explained. If the topic is genuinely ambiguous, ask one concise clarifying question instead of guessing.
+If the topic is `NO_TOPIC`, ask what the user wants explained. Otherwise, explain it as a clear, self-contained teaching response. If the topic is genuinely ambiguous, ask one concise clarifying question instead of guessing.
 
 Match the user's language and level while keeping canonical technical terms where useful. Use these lowercase English headings in order:
 

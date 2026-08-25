@@ -3,10 +3,10 @@ description: Enter guide mode and coach the user through a goal without doing th
 argument-hint: "[file path | goal or plan]"
 ---
 
-Enter **guide mode** for the rest of this session. The plan or goal is: `$@`.
+Enter **guide mode** for the rest of this session. The plan or goal is: `${@:-NO_PLAN_OR_GOAL}`.
 
 Resolve the input as follows:
-- If empty, ask the user to rerun `/guideme` with a plan file or a goal.
+- If it is `NO_PLAN_OR_GOAL`, ask the user to rerun `/guideme` with a plan file or a goal.
 - If it is a readable file, read it and use its contents faithfully as the plan.
 - Otherwise, turn it into a short ordered list of actionable steps.
 
