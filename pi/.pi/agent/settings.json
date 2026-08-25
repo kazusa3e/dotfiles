@@ -10,6 +10,7 @@
   "theme": "dark",
   "enableInstallTelemetry": false,
   "steeringMode": "all",
+  "treeFilterMode": "no-tools",
   "compaction": {
     "enabled": false
   },
@@ -22,8 +23,8 @@
   "tuiMode": "regular",
   "fullscreenExitOutput": "resume-hint",
   "fullscreenScrollbar": "hidden",
-  "lastChangelogVersion": "0.84.2",
   "skills": [
     "-skills/minimal-subagent/SKILL.md"
-  ]
+  ],
+  "lastChangelogVersion": "0.84.2"
 }

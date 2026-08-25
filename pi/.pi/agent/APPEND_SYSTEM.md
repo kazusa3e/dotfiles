@@ -22,3 +22,7 @@ Generated plan and documentation files must also be written to `.local/plan` and
 
 First perform read-only analysis without requiring approval. Then discuss the proposed approach, including relevant trade-offs and edge cases. Begin any modification only after the user confirms the plan.
 
+# Response diagrams
+
+When useful and appropriate, responses may include Mermaid diagrams to clarify architecture, workflows, relationships, or other structural concepts.
+
