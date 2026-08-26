@@ -3,3 +3,4 @@
 ^pid-entrypoint$
 ^pid-shell\.nix$
 ^README\.md$
+^.dockerignore$
