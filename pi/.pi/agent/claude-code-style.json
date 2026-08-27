@@ -9,7 +9,7 @@
   "diffWordWrap": true,
   "expandedPreviewMaxLines": 40,
   "useSummaryTitlesAsThinkingTitle": true,
-  "previewLines": 8,
+  "previewLines": 0,
   "animationIntervalMs": 90,
   "showStartupHeader": true,
   "scrollStepLines": 3,
