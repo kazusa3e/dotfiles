@@ -1,3 +1,4 @@
 *
 !pid-shell.nix
 !pid-entrypoint
+!pid-nix-state.sh

@@ -1,6 +1,15 @@
 #!/bin/sh
 set -eu
 
+(
+    # shellcheck source=pid-nix-state.sh
+    . /etc/pid/nix-state.sh
+    if ! pid_nix_ready; then
+        pid_nix_lock
+        pid_nix_init
+    fi
+)
+
 shell_quote() {
     value=$1
     quoted="'"
