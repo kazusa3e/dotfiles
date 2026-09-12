@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() {
+  printf 'tmux-pane: %s\n' "$*" >&2
+  exit 1
+}
+
+command -v tmux >/dev/null 2>&1 || fail "tmux is not installed"
+[[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]] || fail "not running inside tmux"
+
+current_pane=$TMUX_PANE
+current_window=$(tmux display-message -p -t "$current_pane" '#{window_id}')
+
+target() {
+  local requested=${1:-} pane
+  [[ -n "$requested" ]] || fail "a target pane is required"
+  pane=$(tmux list-panes -t "$current_window" -F '#{pane_index} #{pane_id}' | awk -v target="$requested" '$1 == target || $2 == target { print $2; exit }')
+  [[ -n "$pane" ]] || fail "pane $requested is not in the current window"
+  [[ "$pane" != "$current_pane" ]] || fail "the agent's own pane cannot be targeted"
+  printf '%s\n' "$pane"
+}
+
+case ${1:-} in
+  list)
+    tmux list-panes -t "$current_window" -F $'#{pane_index}\t#{pane_id}\t#{pane_current_command}' | awk -v current="$current_pane" '$2 != current'
+    ;;
+  capture)
+    pane=$(target "${2:-}")
+    tmux capture-pane -p -J -t "$pane" -S "${3:--}"
+    ;;
+  send)
+    pane=$(target "${2:-}")
+    shift 2
+    (($#)) || fail "text is required"
+    tmux send-keys -t "$pane" -l -- "$*"
+    ;;
+  key)
+    pane=$(target "${2:-}")
+    shift 2
+    (($#)) || fail "at least one key is required"
+    tmux send-keys -t "$pane" "$@"
+    ;;
+  *)
+    fail "usage: tmux-pane {list|capture|send|key} ..."
+    ;;
+esac
