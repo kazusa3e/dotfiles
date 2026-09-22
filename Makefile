@@ -14,10 +14,9 @@ none:
 
 .PHONY: install
 install:
+	mkdir -p $(tmux_plugin_dir)
 	stow -t ~ $(app)
 
-	mkdir -p $(tmux_plugin_dir)
-	[ -d $(tmux_plugin_dir)/catppuccin ] || git clone --depth 1 https://github.com/catppuccin/tmux.git $(tmux_plugin_dir)/catppuccin
 	[ -d $(tmux_plugin_dir)/tmux-resurrect ] || git clone --depth 1 https://github.com/tmux-plugins/tmux-resurrect.git $(tmux_plugin_dir)/tmux-resurrect
 	[ -d $(tmux_plugin_dir)/tmux-continuum ] || git clone --depth 1 https://github.com/tmux-plugins/tmux-continuum.git $(tmux_plugin_dir)/tmux-continuum
 
