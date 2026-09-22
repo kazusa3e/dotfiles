@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Use sysstat's single, consolidated sample rather than polling several /proc
+# files from tmux itself.
+set -eu
+
+interface=$(ip route show default | awk 'NR == 1 { print $5 }')
+sample_file=$(mktemp -t tmux-status.XXXXXX)
+network_file=$(mktemp -t tmux-status.XXXXXX)
+trap 'rm -f "$sample_file" "$network_file"' EXIT
+LC_ALL=C iostat -cdxk -y 1 1 >"$sample_file" &
+iostat_pid=$!
+LC_ALL=C sar -n DEV 1 1 >"$network_file" &
+sar_pid=$!
+
+wait "$iostat_pid"
+wait "$sar_pid"
+sample=$(<"$sample_file")
+
+rate() {
+  awk -v kib="$1" 'BEGIN {
+    bytes = kib * 1024
+    mib = bytes / 1048576
+    gib = bytes / 1073741824
+    if (bytes < 1024) value = sprintf("%.0fB/s", bytes)
+    else if (bytes < 1048576) value = sprintf("%dKB/s", int(bytes / 1024))
+    else if (mib < 100) value = sprintf("%.1fMB/s", mib)
+    else if (mib < 1024) value = sprintf("%dMB/s", int(mib))
+    else if (gib < 100) value = sprintf("%.1fGB/s", gib)
+    else value = sprintf("%dGB/s", int(gib))
+    printf "%7s", value
+  }'
+}
+
+disk_sparklines() {
+  awk '
+    {
+      read_rate[++count] = $2
+      write_rate[count] = $3
+      if ($2 > maximum) maximum = $2
+      if ($3 > maximum) maximum = $3
+    }
+    END {
+      glyph[0] = "⣀"; glyph[1] = "⣄"; glyph[2] = "⣤"; glyph[3] = "⣦"
+      glyph[4] = "⣶"; glyph[5] = "⣷"; glyph[6] = "⣾"; glyph[7] = "⣿"
+      for (position = count + 1; position <= 6; position++) read_plot = read_plot "·"
+      for (position = 1; position <= count; position++) {
+        level = maximum > 0 ? int(read_rate[position] * 7 / maximum + 0.5) : 0
+        read_plot = read_plot glyph[level]
+      }
+      for (position = count + 1; position <= 6; position++) write_plot = write_plot "·"
+      for (position = 1; position <= count; position++) {
+        level = maximum > 0 ? int(write_rate[position] * 7 / maximum + 0.5) : 0
+        write_plot = write_plot glyph[level]
+      }
+      print read_plot, write_plot
+    }
+  '
+}
+
+cpu=$(awk '/^avg-cpu:/ { getline; printf "%3.0f%%", 100 - $NF }' <<<"$sample")
+memory=$(awk '/MemTotal:/ { total = $2 } /MemAvailable:/ { available = $2 } END { printf "%3.0f%%", (total - available) * 100 / total }' /proc/meminfo)
+read -r disk_util disk_read disk_written < <(awk '
+  $1 ~ /^Device/ {
+    devices = 1
+    for (column = 1; column <= NF; column++) {
+      if ($column == "kB_read/s" || $column == "rkB/s") read_column = column
+      if ($column == "kB_wrtn/s" || $column == "wkB/s") written_column = column
+      if ($column == "%util") util_column = column
+    }
+    next
+  }
+  devices && $1 ~ /^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme[0-9]+n[0-9]+)$/ {
+    read_kib += $(read_column)
+    written_kib += $(written_column)
+    if ($(util_column) > max_util) max_util = $(util_column)
+  }
+  END {
+    printf "%.0f%% %.3f %.3f\n", max_util, read_kib, written_kib
+  }
+' <<<"$sample")
+
+read -r net_read net_written < <(awk -v interface="$interface" '
+  $1 == "Average:" && $2 == interface { print $5, $6; found = 1 }
+  END { if (!found) print 0, 0 }
+' "$network_file")
+
+state_dir=${XDG_RUNTIME_DIR:-/tmp}
+[[ -d "$state_dir" && -w "$state_dir" ]] || state_dir=/tmp
+state_file="$state_dir/tmux-status-disk-${UID}"
+now=$(date +%s)
+last_sample=$(awk 'NF == 3 { timestamp = $1 } END { print timestamp }' "$state_file" 2>/dev/null || true)
+if [[ -z "$last_sample" || "$((now - last_sample))" -ge 10 ]]; then
+  state_temp=$(mktemp "${state_file}.XXXXXX")
+  {
+    [[ -f "$state_file" ]] && awk 'NF == 3' "$state_file" | tail -n 5
+    printf '%s %s %s\n' "$now" "$disk_read" "$disk_written"
+  } >"$state_temp"
+  mv "$state_temp" "$state_file"
+fi
+read -r read_sparkline write_sparkline < <(disk_sparklines <"$state_file")
+
+printf '#[fg=#89dceb,bold]󰈀#[nobold] %s↓%s↑#[fg=#6c7086] │ #[fg=#f9e2af,bold]󰻠#[nobold]%4s#[fg=#6c7086] │ #[fg=#fab387,bold]󰋊#[nobold]%4s R%s W%s#[fg=#6c7086] │ #[fg=#cba6f7,bold]󰍛#[nobold]%4s' \
+  "$(rate "$net_read")" \
+  "$(rate "$net_written")" \
+  "$cpu" \
+  "$disk_util" \
+  "$read_sparkline" \
+  "$write_sparkline" \
+  "$memory"
