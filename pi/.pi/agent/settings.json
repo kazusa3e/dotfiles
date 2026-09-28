@@ -21,6 +21,7 @@
   },
   "hideThinkingBlock": true,
   "showCacheMissNotices": true,
+  "cacheWarming": "idle",
   "markdown": {
     "mermaid": "final"
   },
