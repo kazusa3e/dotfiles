@@ -3,11 +3,16 @@
   "packages": [
     "npm:pi-web-access",
     "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:pi-cc-extensions",
-    "npm:pi-autoname",
-    "npm:pi-hashline-edit"
+    {
+      "source": "npm:pi-cc-extensions",
+      "themes": [
+        "-themes/cc-dark.json",
+        "-themes/cc-light.json"
+      ]
+    }
   ],
   "theme": "dark",
+  "enableSkillCommands": true,
   "enableInstallTelemetry": false,
   "steeringMode": "all",
   "treeFilterMode": "no-tools",
@@ -26,5 +31,5 @@
   "skills": [
     "-skills/minimal-subagent/SKILL.md"
   ],
-  "lastChangelogVersion": "0.84.2"
+  "lastChangelogVersion": "0.87.1"
 }

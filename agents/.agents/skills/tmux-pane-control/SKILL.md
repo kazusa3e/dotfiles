@@ -2,6 +2,10 @@
 name: tmux-pane-control
 description: Inspect or interact with another tmux pane in the current window. Use when the user asks to read a pane or explicitly send text or keys to it.
 compatibility: Requires tmux and a session with TMUX_PANE set.
+disable-model-invocation: true
+hide: true
+metadata:
+  opencode/autoinvoke: "false"
 ---
 
 # Tmux Pane Control

@@ -1,10 +1,10 @@
 # Language conventions
 
-Use English for generated code and project artifacts: code comments, commit messages, PR descriptions, documentation, prompts, templates, skills, identifiers, logs, and error messages. Follow an established codebase convention when it uses another language.
+Use English for code identifiers, comments, logs, error messages, and commit messages unless the user requests another language or the codebase follows a different convention. Choose the language of documentation, PR descriptions, prompts, templates, and skills for their intended readers, following project conventions.
 
-Keep code comments concise. Add a comment only when the code would otherwise violate the principle of least surprise, or when it records a meaningful trade-off between alternative approaches. Explain why the chosen approach was taken, not what the code does.
+Keep code comments concise. Use them to explain non-obvious reasons, constraints, invariants, or meaningful trade-offs; do not restate what the code does.
 
-An explicit language request overrides this rule for that output only. Reply in the language the user is writing in.
+Reply in the user's preferred language when it is clear from the conversation, unless the task requires another language.
 
 # Response references
 
@@ -12,7 +12,7 @@ When referring to a file in a response, always format it as an inline-code `path
 
 # Nix packages
 
-A Nix daemon is available in the environment. When a package is needed temporarily, use `nix-shell -p pkg` rather than installing it permanently.
+A Nix daemon is available in the environment. Prefer the project's existing development environment. When a temporary package is needed outside it, use `nix-shell -p pkg` rather than installing it permanently.
 
 # Generated artifacts
 
@@ -20,9 +20,4 @@ Generated plan and documentation files must also be written to `.local/plan` and
 
 # Implementation workflow
 
-First perform read-only analysis without requiring approval. Then discuss the proposed approach, including relevant trade-offs and edge cases. Begin any modification only after the user confirms the plan.
-
-# Response diagrams
-
-When useful and appropriate, responses may include Mermaid diagrams to clarify architecture, workflows, relationships, or other structural concepts.
-
+Inspect the context needed for the task, then carry out changes the user has authorized. Discuss relevant trade-offs and edge cases when they affect the decision. Ask for clarification when the intended outcome is unclear, and ask for approval before irreversible actions or actions with external effects unless the user has already authorized them.
