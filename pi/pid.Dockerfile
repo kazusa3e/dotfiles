@@ -6,6 +6,8 @@ ARG NIXPKGS_UNSTABLE_CHANNEL=unstable
 ARG USER_NAME=kazusa
 ARG USER_UID=1000
 ARG USER_GID=1000
+ARG HTTP_CONNECTIONS=25
+ARG MAX_SUBSTITUTION_JOBS=16
 
 ENV TERM=xterm-256color \
     COLORTERM=truecolor \
@@ -22,7 +24,12 @@ ENV TERM=xterm-256color \
 # directories. Store paths remain root-owned: they are immutable and only the
 # store directory itself must be writable for new realizations.
 RUN set -eu; \
-    printf '%s\n' 'experimental-features = nix-command' 'sandbox = false' > /etc/nix/nix.conf; \
+    printf '%s\n' \
+        'experimental-features = nix-command' \
+        'sandbox = false' \
+        "http-connections = ${HTTP_CONNECTIONS}" \
+        "max-substitution-jobs = ${MAX_SUBSTITUTION_JOBS}" \
+        > /etc/nix/nix.conf; \
     mkdir -p /etc/pid /etc/sudoers.d /home/${USER_NAME} /workspace; \
     for file in /etc/passwd /etc/group /etc/shadow /etc/gshadow; do \
         if [ -L "$file" ]; then \
