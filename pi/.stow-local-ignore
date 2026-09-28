@@ -4,3 +4,5 @@
 ^pid-shell\.nix$
 ^README\.md$
 ^.dockerignore$
+^tests$
+^web-search-cache$
