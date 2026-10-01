@@ -26,10 +26,8 @@ export class ResponseMetrics {
   private requestEnd: number | undefined;
   private requestFailed = false;
   private firstDelta: number | undefined;
-  private textIndex: number | undefined;
-  private lastTextDelta: number | undefined;
-  private measuredMs = 0;
-  private estimatedTokens = 0;
+  private lastDelta: number | undefined;
+  private generatedTokens = 0;
   private accepting = false;
 
   reset(): void {
@@ -38,10 +36,8 @@ export class ResponseMetrics {
     this.requestEnd = undefined;
     this.requestFailed = false;
     this.firstDelta = undefined;
-    this.textIndex = undefined;
-    this.lastTextDelta = undefined;
-    this.measuredMs = 0;
-    this.estimatedTokens = 0;
+    this.lastDelta = undefined;
+    this.generatedTokens = 0;
     this.accepting = false;
   }
 
@@ -59,33 +55,21 @@ export class ResponseMetrics {
   record(event: AssistantMessageEvent, now: number): void {
     if (!this.accepting) return;
     if (event.type === "thinking_start" || event.type === "thinking_delta") {
-      this.closeText();
       this.phase = "thinking";
     } else if (event.type === "toolcall_start" || event.type === "toolcall_delta") {
-      this.closeText();
       this.phase = "toolcall";
     } else if (event.type === "text_start") {
-      this.closeText();
       this.phase = "text";
-    } else if (event.type === "text_end") {
-      this.closeText();
     }
 
     if (event.type !== "text_delta" && event.type !== "thinking_delta" && event.type !== "toolcall_delta") return;
     if (!event.delta) return;
+    // Count all streamed output, not hidden reasoning or provider usage totals.
+    // Exclude the first chunk, but keep gaps across content/phase transitions.
+    if (this.firstDelta !== undefined) this.generatedTokens += estimateTokens(event.delta);
     this.firstDelta ??= now;
-    if (event.type !== "text_delta") return;
-
-    this.phase = "text";
-    if (this.textIndex !== event.contentIndex) this.closeText();
-    // The first chunk's generation interval is unobservable. Exclude its
-    // tokens as well as its time rather than inflating short/buffered samples.
-    if (this.lastTextDelta !== undefined) {
-      this.measuredMs += Math.max(0, now - this.lastTextDelta);
-      this.estimatedTokens += estimateTokens(event.delta);
-    }
-    this.textIndex = event.contentIndex;
-    this.lastTextDelta = now;
+    this.lastDelta = now;
+    if (event.type === "text_delta") this.phase = "text";
   }
 
   finish(reason: string, now = performance.now()): void {
@@ -94,7 +78,6 @@ export class ResponseMetrics {
       this.requestFailed = reason === "aborted" || reason === "error";
     }
     this.accepting = false;
-    this.closeText();
     this.phase = reason === "aborted" ? "aborted" : reason === "error" ? "error" : "done";
   }
 
@@ -117,19 +100,16 @@ export class ResponseMetrics {
     return `Req ${marker}${seconds.toFixed(1)}s`;
   }
 
-  private closeText(): void {
-    this.textIndex = undefined;
-    this.lastTextDelta = undefined;
-  }
-
   get ttftSeconds(): number | undefined {
     return this.firstDelta === undefined || this.requestStart === undefined
       ? undefined : Math.max(0, this.firstDelta - this.requestStart) / 1000;
   }
 
   get outputRate(): number | undefined {
-    return this.measuredMs >= MIN_SAMPLE_MS && this.estimatedTokens > 0
-      ? this.estimatedTokens / (this.measuredMs / 1000) : undefined;
+    if (this.firstDelta === undefined || this.lastDelta === undefined) return undefined;
+    const elapsedMs = Math.max(0, this.lastDelta - this.firstDelta);
+    return elapsedMs >= MIN_SAMPLE_MS && this.generatedTokens > 0
+      ? this.generatedTokens / (elapsedMs / 1000) : undefined;
   }
 
   labels(): [string, string] {
@@ -141,7 +121,9 @@ export class ResponseMetrics {
       idle: "", waiting: "waiting", thinking: "thinking", toolcall: "tool call",
       text: "sampling", done: "", tool: "tool", aborted: "aborted", error: "error",
     }[this.phase];
-    const showRate = (this.phase === "text" || this.phase === "done") && rate !== undefined;
+    const showRate = rate !== undefined
+      && this.phase !== "idle" && this.phase !== "waiting"
+      && this.phase !== "aborted" && this.phase !== "error";
     const output = showRate ? `~${Math.round(rate)} tok/s` : `—${state ? ` (${state})` : ""}`;
     return [`TTFT ${latency}`, `Out ${output}`];
   }

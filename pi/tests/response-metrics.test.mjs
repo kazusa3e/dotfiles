@@ -32,7 +32,7 @@ test("metadata does not count as first output", () => {
   assert.equal(m.ttftSeconds, undefined);
 });
 
-test("text rate excludes the first chunk and completion tail", () => {
+test("output rate counts all streamed deltas and excludes the first chunk", () => {
   const m = new ResponseMetrics();
   m.start(0);
   m.record(delta("text_delta", "x".repeat(1000)), 1000);
@@ -42,7 +42,7 @@ test("text rate excludes the first chunk and completion tail", () => {
   assert.deepEqual(m.labels(), ["TTFT 1.00s", "Out ~10 tok/s"]);
 });
 
-test("hidden thinking tokens and tool arguments never inflate text speed", () => {
+test("output rate includes thinking and tool-call deltas", () => {
   const m = new ResponseMetrics();
   m.start(0);
   m.record(delta("thinking_delta", "reasoning".repeat(1000)), 1000);
@@ -52,10 +52,10 @@ test("hidden thinking tokens and tool arguments never inflate text speed", () =>
   e.partial.usage = { output: 1000000, reasoning: 999000 };
   m.record(e, 9000);
   assert.equal(m.ttftSeconds, 1);
-  assert.equal(m.outputRate, 10);
+  assert.ok(m.outputRate > 10);
 });
 
-test("interleaved thinking and tool-call intervals are excluded", () => {
+test("interleaved thinking and tool-call deltas contribute to output rate", () => {
   const m = new ResponseMetrics();
   m.start(0);
   m.record(delta("text_delta", "first"), 1000);
@@ -67,10 +67,10 @@ test("interleaved thinking and tool-call intervals are excluded", () => {
   m.record({ type: "toolcall_start", contentIndex: 3 }, 22000);
   m.record(delta("text_delta", "third start", 4), 30000);
   m.record(delta("text_delta", "a".repeat(120), 4), 31000);
-  assert.equal(m.outputRate, 20);
+  assert.ok(m.outputRate > 2 && m.outputRate < 3);
 });
 
-test("block boundaries exclude gaps even without explicit start events", () => {
+test("output rate spans gaps between all streamed deltas", () => {
   const m = new ResponseMetrics();
   m.start(0);
   m.record(delta("text_delta", "first"), 1000);
@@ -80,7 +80,7 @@ test("block boundaries exclude gaps even without explicit start events", () => {
   m.record({ type: "text_end", contentIndex: 1 }, 22000);
   m.record(delta("text_delta", "next block", 1), 40000);
   m.record(delta("text_delta", "a".repeat(40), 1), 41000);
-  assert.equal(m.outputRate, 10);
+  assert.ok(m.outputRate > 0 && m.outputRate < 2);
 });
 
 test("short, empty, buffered and tool-only responses have no rate", () => {
@@ -94,6 +94,16 @@ test("short, empty, buffered and tool-only responses have no rate", () => {
     assert.equal(m.outputRate, undefined, kind);
     assert.equal(m.labels()[1], "Out —", kind);
   }
+});
+
+test("output stays visible during thinking, while waiting has no stale rate", () => {
+  const m = new ResponseMetrics();
+  m.start(0);
+  m.record(delta("thinking_delta", "first"), 1000);
+  m.record(delta("thinking_delta", "a".repeat(40)), 2000);
+  assert.deepEqual(m.labels(), ["TTFT 1.00s", "Out ~10 tok/s"]);
+  m.start(3000);
+  assert.deepEqual(m.labels(), ["TTFT …", "Out — (waiting)"]);
 });
 
 test("a retry/new request clears all previous samples", () => {
@@ -169,7 +179,7 @@ test("integration: request boundary, tool isolation, follow-up reset and final u
   h.emit("tool_execution_start", { toolCallId: "b" }, 11000);
   h.emit("tool_execution_update", { partialResult: "a".repeat(10000) }, 12000);
   h.emit("tool_execution_end", { toolCallId: "a" }, 20000);
-  assert.equal(h.statuses.get(OUTPUT_KEY), "Out — (tool)");
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
   h.emit("message_end", { message: { role: "toolResult" } }, 21000);
   h.emit("tool_execution_end", { toolCallId: "b" }, 30000);
   h.emit("turn_end", { outcome: "completed" }, 30000);
