@@ -13,12 +13,26 @@ Examples:
 
 import argparse
 import concurrent.futures
-import os
+import glob
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+
+_FETCH_TIMEOUT = 30  # seconds per repo fetch
+_GIT_TIMEOUT = 60  # seconds per local git command
+
+
+@dataclass
+class SyncTarget:
+    """Comparison with a configured or same-name remote-tracking branch."""
+    label: str
+    role: str
+    behind: Optional[int] = None
+    ahead: Optional[int] = None
 
 
 @dataclass
@@ -28,9 +42,9 @@ class RepoStatus:
     branch: str
     dirty_unstaged: bool
     dirty_staged: bool
+    dirty_untracked: bool
     has_upstream: bool
-    ahead: int
-    behind: int
+    sync_targets: list[SyncTarget]
     error: Optional[str] = None
 
 
@@ -64,15 +78,38 @@ def _pad(text: str, width: int, align: str, color: Optional[str], use_color: boo
     Pad first (on plain text), then wrap with ANSI codes so the display
     width is correct in terminals.
     """
+    spaces = max(0, width - _display_width(text))
     if align == "left":
-        padded = text.ljust(width)
+        padded = text + " " * spaces
     elif align == "center":
-        padded = text.center(width)
+        left = spaces // 2
+        padded = " " * left + text + " " * (spaces - left)
     else:
-        padded = text.rjust(width)
+        padded = " " * spaces + text
     if color and use_color:
         return f"{color}{padded}{Colors.RESET}"
     return padded
+
+
+def _display_width(text: str) -> int:
+    """Measure the terminal width of ordinary text, including CJK characters."""
+    return sum(
+        0 if unicodedata.combining(char) else
+        2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
+        for char in text
+    )
+
+
+def _truncate(text: str, width: int) -> str:
+    """Fit text in a terminal column, marking truncation with an ellipsis."""
+    if _display_width(text) <= width:
+        return text
+    result = ""
+    for char in text:
+        if _display_width(result + char) > width - 1:
+            break
+        result += char
+    return result + "…"
 
 
 # --- Path resolution ---
@@ -88,10 +125,10 @@ def is_glob_pattern(arg: str) -> bool:
 
 
 def resolve_paths(args: list[str]) -> list[Path]:
-    """Expand all input args into a deduplicated, sorted list of directory Paths.
+    """Expand input args into unique directory Paths in argument order.
 
     - Plain dirs that exist → add directly
-    - Glob patterns → expand via Path.glob(), collect matched directories
+    - Glob patterns → expand in any path component, collect matched directories
     - Non-existent plain paths → skip silently
     """
     seen: dict[Path, None] = {}
@@ -99,13 +136,8 @@ def resolve_paths(args: list[str]) -> list[Path]:
     for arg in args:
         expanded = expand_path(arg)
         if is_glob_pattern(arg):
-            parent = expanded.parent.resolve()
-            pattern = expanded.name
-            if not parent.is_dir():
-                print(f"warning: glob parent does not exist: {arg}", file=sys.stderr)
-                continue
-            matched = sorted(parent.glob(pattern))
-            for m in matched:
+            for match in sorted(glob.glob(str(expanded))):
+                m = Path(match)
                 if m.is_dir():
                     seen[m.resolve()] = None
         else:
@@ -113,23 +145,26 @@ def resolve_paths(args: list[str]) -> list[Path]:
                 seen[expanded.resolve()] = None
             # Silently skip non-directories (common with shell-expanded globs)
 
-    return sorted(seen.keys())
+    return list(seen)
 
 
 # --- Repo discovery ---
 
-def is_git_repo(path: Path) -> bool:
-    """Check if a directory is a git repository."""
+def git_repo_root(path: Path) -> Optional[Path]:
+    """Return the repository root, including when path is a subdirectory."""
     try:
         r = subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
+            ["git", "rev-parse", "--show-toplevel"],
             cwd=path,
             capture_output=True,
             text=True,
+            timeout=_GIT_TIMEOUT,
         )
-        return r.returncode == 0
+        if r.returncode == 0:
+            return Path(r.stdout.strip()).resolve()
     except (OSError, subprocess.SubprocessError):
-        return False
+        pass
+    return None
 
 
 _SKIP_DIRS = {".git", ".venv", "node_modules", ".tox", "__pycache__", ".cargo", ".rustup"}
@@ -144,8 +179,9 @@ def walk_for_repos(root: Path, max_depth: int) -> list[Path]:
     repos: list[Path] = []
 
     def _walk(current: Path, remaining: int) -> None:
-        if is_git_repo(current):
-            repos.append(current)
+        repo_root = git_repo_root(current)
+        if repo_root is not None:
+            repos.append(repo_root)
             return
         if remaining <= 0:
             return
@@ -160,10 +196,7 @@ def walk_for_repos(root: Path, max_depth: int) -> list[Path]:
                 target = entry.resolve(strict=False)
                 if not target.is_dir():
                     continue
-                if is_git_repo(target):
-                    repos.append(target)
-                elif remaining > 1:
-                    _walk(target, remaining - 1)
+                _walk(target, remaining - 1)
             elif entry.is_dir():
                 _walk(entry, remaining - 1)
 
@@ -174,44 +207,44 @@ def walk_for_repos(root: Path, max_depth: int) -> list[Path]:
 def find_git_repos(dirs: list[Path], depth: int) -> list[Path]:
     """Given a list of directories, find all git repos within them.
 
-    If a directory IS a git repo itself, include it directly.
-    If NOT a git repo, recurse up to `depth` levels to find sub-repos.
+    If a directory is inside a git repo, include that repo's root.
+    Otherwise, recurse up to `depth` levels to find sub-repos.
     """
     seen: dict[Path, None] = {}
 
     for d in dirs:
-        if is_git_repo(d):
-            seen[d] = None
+        repo_root = git_repo_root(d)
+        if repo_root is not None:
+            seen[repo_root] = None
         else:
             for repo in walk_for_repos(d, depth):
                 seen[repo] = None
 
-    return sorted(seen.keys())
+    return list(seen)
 
 
 # --- Git inspection ---
 
-_FETCH_TIMEOUT = 30  # seconds per repo fetch
-
-
-def parse_dirty(porcelain: str) -> tuple[bool, bool]:
+def parse_dirty(porcelain: str) -> tuple[bool, bool, bool]:
     """Parse `git status --porcelain` output.
 
-    Returns (has_unstaged, has_staged).
-    - Both non-space chars in columns 1-2: staged change
-    - Space + non-space char: unstaged change
+    Returns (has_unstaged, has_staged, has_untracked).
     """
     has_staged = False
     has_unstaged = False
+    has_untracked = False
     for line in porcelain.splitlines():
         if len(line) < 3:
             continue
         xy = line[:2]
-        if xy[0] != " " and xy[0] != "?":
+        if xy == "??":
+            has_untracked = True
+            continue
+        if xy[0] not in (" ", "!"):
             has_staged = True
-        if xy[1] != " ":
+        if xy[1] not in (" ", "!"):
             has_unstaged = True
-    return has_unstaged, has_staged
+    return has_unstaged, has_staged, has_untracked
 
 
 def inspect_repo(repo_path: Path, do_fetch: bool = False) -> RepoStatus:
@@ -221,6 +254,7 @@ def inspect_repo(repo_path: Path, do_fetch: bool = False) -> RepoStatus:
         r = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=repo_path, capture_output=True, text=True, check=True,
+            timeout=_GIT_TIMEOUT,
         )
         branch = r.stdout.strip()
 
@@ -233,51 +267,51 @@ def inspect_repo(repo_path: Path, do_fetch: bool = False) -> RepoStatus:
         r = subprocess.run(
             ["git", "status", "--porcelain"],
             cwd=repo_path, capture_output=True, text=True, check=True,
+            timeout=_GIT_TIMEOUT,
         )
-        has_unstaged, has_staged = parse_dirty(r.stdout)
+        has_unstaged, has_staged, has_untracked = parse_dirty(r.stdout)
 
-        # Optional fetch — only the upstream remote
+        upstream_ref, upstream_remote, push_ref, push_remote = _branch_targets(repo_path)
+        remotes = _get_remotes(repo_path)
+
+        # Refresh every remote before comparing its local tracking references.
         if do_fetch:
-            _do_fetch(repo_path)
+            _do_fetch(repo_path, remotes)
 
-        # Upstream tracking
-        r = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "@{upstream}"],
-            cwd=repo_path, capture_output=True, text=True,
-        )
-        if r.returncode != 0:
-            return RepoStatus(
-                path=repo_path, branch=branch,
-                dirty_unstaged=has_unstaged, dirty_staged=has_staged,
-                has_upstream=False, ahead=0, behind=0,
-            )
-
-        # Sync status: behind / ahead
-        r = subprocess.run(
-            ["git", "rev-list", "--left-right", "--count", "@{upstream}...HEAD"],
-            cwd=repo_path, capture_output=True, text=True, check=True,
-        )
-        parts = r.stdout.strip().split()
-        behind = int(parts[0]) if len(parts) > 0 else 0
-        ahead = int(parts[1]) if len(parts) > 1 else 0
+        targets: list[SyncTarget] = []
+        represented_remotes: set[str] = set()
+        if upstream_ref:
+            targets.append(_inspect_target(repo_path, upstream_ref, "upstream"))
+            if upstream_remote and upstream_remote != ".":
+                represented_remotes.add(upstream_remote)
+        if push_ref and push_ref != upstream_ref:
+            targets.append(_inspect_target(repo_path, push_ref, "push"))
+            if push_remote and push_remote != ".":
+                represented_remotes.add(push_remote)
+        if branch != "(HEAD detached)":
+            for remote in remotes:
+                if remote not in represented_remotes:
+                    ref = f"refs/remotes/{remote}/{branch}"
+                    targets.append(_inspect_target(repo_path, ref, "remote"))
 
         return RepoStatus(
             path=repo_path, branch=branch,
             dirty_unstaged=has_unstaged, dirty_staged=has_staged,
-            has_upstream=True, ahead=ahead, behind=behind,
+            dirty_untracked=has_untracked, has_upstream=bool(upstream_ref),
+            sync_targets=targets,
         )
     except subprocess.CalledProcessError as e:
         return RepoStatus(
             path=repo_path, branch="(error)",
-            dirty_unstaged=False, dirty_staged=False,
-            has_upstream=False, ahead=0, behind=0,
+            dirty_unstaged=False, dirty_staged=False, dirty_untracked=False,
+            has_upstream=False, sync_targets=[],
             error=f"git command failed: {e.cmd}",
         )
     except Exception as e:
         return RepoStatus(
             path=repo_path, branch="(error)",
-            dirty_unstaged=False, dirty_staged=False,
-            has_upstream=False, ahead=0, behind=0,
+            dirty_unstaged=False, dirty_staged=False, dirty_untracked=False,
+            has_upstream=False, sync_targets=[],
             error=str(e),
         )
 
@@ -288,22 +322,22 @@ def _is_detached_head(repo_path: Path) -> bool:
         r = subprocess.run(
             ["git", "symbolic-ref", "-q", "HEAD"],
             cwd=repo_path, capture_output=True, text=True,
+            timeout=_GIT_TIMEOUT,
         )
         return r.returncode != 0
     except (OSError, subprocess.SubprocessError):
         return False
 
 
-def _do_fetch(repo_path: Path) -> None:
-    """Fetch the current branch's upstream remote, or the first available remote."""
-    remote = _get_upstream_remote(repo_path)
-    if remote is None:
-        return  # No remotes configured, nothing to fetch
+def _do_fetch(repo_path: Path, remotes: list[str]) -> None:
+    """Fetch all configured remotes before checking their tracking refs."""
+    if not remotes:
+        return
     try:
         r = subprocess.run(
-            ["git", "fetch", remote],
+            ["git", "fetch", "--all"],
             cwd=repo_path, capture_output=True, text=True,
-            timeout=_FETCH_TIMEOUT,
+            timeout=_FETCH_TIMEOUT * len(remotes),
         )
         if r.returncode != 0:
             print(f"warning: fetch failed for {repo_path}: {r.stderr.strip()}", file=sys.stderr)
@@ -313,35 +347,58 @@ def _do_fetch(repo_path: Path) -> None:
         print(f"warning: fetch error for {repo_path}: {e}", file=sys.stderr)
 
 
-def _get_upstream_remote(repo_path: Path) -> Optional[str]:
-    """Get the remote name for the current branch's upstream.
+def _branch_targets(repo_path: Path) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """Read the current branch's configured upstream and push destinations."""
+    branch_ref = subprocess.run(
+        ["git", "symbolic-ref", "-q", "HEAD"],
+        cwd=repo_path, capture_output=True, text=True, timeout=_GIT_TIMEOUT,
+    )
+    if branch_ref.returncode != 0:
+        return None, None, None, None
+    r = subprocess.run(
+        ["git", "for-each-ref",
+         "--format=%(upstream)%09%(upstream:remotename)%09%(push)%09%(push:remotename)",
+         branch_ref.stdout.strip()],
+        cwd=repo_path, capture_output=True, text=True, check=True,
+        timeout=_GIT_TIMEOUT,
+    )
+    parts = r.stdout.rstrip("\n").split("\t")
+    if len(parts) != 4:
+        return None, None, None, None
+    return parts[0] or None, parts[1] or None, parts[2] or None, parts[3] or None
 
-    Falls back to the first available remote. Returns None if no remotes exist.
-    """
-    try:
-        r = subprocess.run(
-            ["git", "for-each-ref", "--format=%(upstream:remotename)", "refs/heads/HEAD"],
-            cwd=repo_path, capture_output=True, text=True,
-        )
-        remote = r.stdout.strip()
-        if remote:
-            return remote
-    except (OSError, subprocess.SubprocessError):
-        pass
 
-    # Fallback: try to get the first available remote
-    try:
-        r = subprocess.run(
-            ["git", "remote"],
-            cwd=repo_path, capture_output=True, text=True,
-        )
-        remotes = [line.strip() for line in r.stdout.strip().splitlines() if line.strip()]
-        if remotes:
-            return remotes[0]
-    except (OSError, subprocess.SubprocessError):
-        pass
+def _get_remotes(repo_path: Path) -> list[str]:
+    r = subprocess.run(
+        ["git", "remote"], cwd=repo_path, capture_output=True, text=True,
+        check=True, timeout=_GIT_TIMEOUT,
+    )
+    return [remote for remote in r.stdout.splitlines() if remote]
 
-    return None
+
+def _ref_label(ref: str) -> str:
+    if ref.startswith("refs/remotes/"):
+        return ref.removeprefix("refs/remotes/")
+    if ref.startswith("refs/heads/"):
+        return "local/" + ref.removeprefix("refs/heads/")
+    return ref
+
+
+def _inspect_target(repo_path: Path, ref: str, role: str) -> SyncTarget:
+    label = _ref_label(ref)
+    exists = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", ref],
+        cwd=repo_path, capture_output=True, text=True, timeout=_GIT_TIMEOUT,
+    )
+    if exists.returncode != 0:
+        return SyncTarget(label=label, role=role)
+    r = subprocess.run(
+        ["git", "rev-list", "--left-right", "--count", f"{ref}...HEAD"],
+        cwd=repo_path, capture_output=True, text=True, check=True,
+        timeout=_GIT_TIMEOUT,
+    )
+    behind, ahead = map(int, r.stdout.split())
+    return SyncTarget(label=label, role=role, behind=behind, ahead=ahead)
 
 
 # --- Output formatting ---
@@ -357,8 +414,6 @@ def format_relative(p: Path) -> str:
 
 COL_PATH_W = 40
 COL_BRANCH_W = 18
-COL_DIRTY_W = 7
-COL_SYNC_W = 15
 
 
 def format_table(statuses: list[RepoStatus], use_color: bool) -> str:
@@ -367,119 +422,127 @@ def format_table(statuses: list[RepoStatus], use_color: bool) -> str:
         return _c("No git repositories found.", Colors.DIM, use_color)
 
     # Build rows with PLAIN text (no ANSI codes)
-    rows: list[tuple[str, str, str, str]] = []
+    rows: list[tuple[str, str, str, str, Optional[str], Optional[str]]] = []
     for s in statuses:
-        path_str = format_relative(s.path)
-        if len(path_str) > COL_PATH_W:
-            path_str = path_str[:COL_PATH_W - 1] + "…"
-        rows.append((
-            path_str,
-            s.branch,
-            _dirty_symbol_plain(s),
-            _sync_text_plain(s),
-        ))
+        path_str = _truncate(format_relative(s.path), COL_PATH_W)
+        sync_lines = _sync_lines(s)
+        for index, (sync_text, sync_color) in enumerate(sync_lines):
+            rows.append((
+                path_str if index == 0 else "",
+                _truncate(s.branch, COL_BRANCH_W) if index == 0 else "",
+                _changes_text(s) if index == 0 else "",
+                sync_text,
+                _changes_color(s) if index == 0 else None,
+                sync_color,
+            ))
+    changes_width = max(_display_width("CHANGES"), *(_display_width(row[2]) for row in rows))
+    sync_width = max(_display_width("SYNC"), *(_display_width(row[3]) for row in rows))
 
     # Header — pad plain text first, then color
     lines: list[str] = []
     header = (
         f"{_c('PATH'.ljust(COL_PATH_W), Colors.BOLD, use_color)}  "
         f"{_c('BRANCH'.ljust(COL_BRANCH_W), Colors.BOLD, use_color)}  "
-        f"{_c('DIRTY'.center(COL_DIRTY_W), Colors.BOLD, use_color)}  "
+        f"{_c(_pad('CHANGES', changes_width, 'left', None, False), Colors.BOLD, use_color)}  "
         f"{_c('SYNC', Colors.BOLD, use_color)}"
     )
     lines.append(header)
     sep = (
-        f"{'─' * COL_PATH_W}  {'─' * COL_BRANCH_W}  {'─' * COL_DIRTY_W}  {'─' * COL_SYNC_W}"
+        f"{'─' * COL_PATH_W}  {'─' * COL_BRANCH_W}  {'─' * changes_width}  {'─' * sync_width}"
     )
     lines.append(sep)
 
     # Data rows — pad plain text, then apply color per-cell
-    for (path_s, branch_s, dirty_s, sync_s), s in zip(rows, statuses):
-        dirty_clr = _dirty_color(s)
-        sync_clr = _sync_color(s)
+    for path_s, branch_s, changes_s, sync_s, changes_clr, sync_clr in rows:
         lines.append(
-            f"{path_s:<{COL_PATH_W}}  "
-            f"{branch_s:<{COL_BRANCH_W}}  "
-            f"{_pad(dirty_s, COL_DIRTY_W, 'center', dirty_clr, use_color)}  "
+            f"{_pad(path_s, COL_PATH_W, 'left', None, use_color)}  "
+            f"{_pad(branch_s, COL_BRANCH_W, 'left', None, use_color)}  "
+            f"{_pad(changes_s, changes_width, 'left', changes_clr, use_color)}  "
             f"{_c(sync_s, sync_clr, use_color)}"
         )
 
     return "\n".join(lines)
 
 
-def _dirty_symbol_plain(s: RepoStatus) -> str:
-    if s.error:
-        return "!"
-    if s.dirty_staged and s.dirty_unstaged:
-        return "●"
-    if s.dirty_staged:
-        return "S"
-    if s.dirty_unstaged:
-        return "M"
-    return "✓"
-
-
-def _dirty_color(s: RepoStatus) -> Optional[str]:
-    if s.error:
-        return Colors.RED
-    if s.dirty_staged and s.dirty_unstaged:
-        return Colors.RED
-    if s.dirty_staged or s.dirty_unstaged:
-        return Colors.YELLOW
-    return Colors.GREEN
-
-
-def _sync_text_plain(s: RepoStatus) -> str:
+def _changes_text(s: RepoStatus) -> str:
     if s.error:
         return "error"
-    if not s.has_upstream:
-        return "no upstream"
-    if s.ahead > 0 and s.behind > 0:
-        return f"diverged {s.behind}/{s.ahead}"
-    if s.behind > 0:
-        return f"behind {s.behind}"
-    if s.ahead > 0:
-        return f"ahead {s.ahead}"
-    return "✓"
+    changes = []
+    if s.dirty_staged:
+        changes.append("staged")
+    if s.dirty_unstaged:
+        changes.append("unstaged")
+    if s.dirty_untracked:
+        changes.append("untracked")
+    return ", ".join(changes) if changes else "clean"
 
 
-def _sync_color(s: RepoStatus) -> Optional[str]:
+def _changes_color(s: RepoStatus) -> Optional[str]:
     if s.error:
         return Colors.RED
-    if not s.has_upstream:
-        return Colors.BLUE
-    if s.ahead > 0 and s.behind > 0:
+    if sum((s.dirty_staged, s.dirty_unstaged, s.dirty_untracked)) > 1:
         return Colors.RED
-    if s.behind > 0:
-        return Colors.RED
-    if s.ahead > 0:
+    if s.dirty_staged or s.dirty_unstaged or s.dirty_untracked:
         return Colors.YELLOW
     return Colors.GREEN
+
+
+def _sync_lines(s: RepoStatus) -> list[tuple[str, Optional[str]]]:
+    if s.error:
+        return [("error", Colors.RED)]
+    lines: list[tuple[str, Optional[str]]] = []
+    if not s.has_upstream:
+        lines.append(("no upstream", Colors.BLUE))
+    for target in s.sync_targets:
+        prefix = "push " if target.role == "push" else ""
+        name = prefix + target.label
+        if target.ahead is None or target.behind is None:
+            lines.append((f"{name}: no local ref", Colors.BLUE))
+        elif target.ahead and target.behind:
+            lines.append((f"{name}: diverged {target.behind}/{target.ahead}", Colors.RED))
+        elif target.behind:
+            lines.append((f"{name}: behind {target.behind}", Colors.RED))
+        elif target.ahead:
+            lines.append((f"{name}: ahead {target.ahead}", Colors.YELLOW))
+        else:
+            lines.append((f"{name}: in sync", Colors.GREEN))
+    return lines
 
 
 # --- Sorting ---
 
-_DIRTY_SEVERITY = {"!": 0, "●": 1, "S": 2, "M": 3, "✓": 4}
-
-
 def _sync_severity(s: RepoStatus) -> int:
-    """Lower = more urgent. 0=error, 1=diverged, 2=behind, 3=ahead, 4=no upstream, 5=clean."""
+    """Sort by the most urgent displayed comparison."""
     if s.error:
         return 0
-    if s.ahead > 0 and s.behind > 0:
-        return 1
-    if s.behind > 0:
-        return 2
-    if s.ahead > 0:
-        return 3
-    if not s.has_upstream:
-        return 4
-    return 5  # in sync
+    severity = 5 if not s.has_upstream else 6
+    for target in s.sync_targets:
+        if target.ahead is None or target.behind is None:
+            severity = min(severity, 4)
+        elif target.ahead and target.behind:
+            severity = min(severity, 1)
+        elif target.behind:
+            severity = min(severity, 2)
+        elif target.ahead:
+            severity = min(severity, 3)
+    return severity
 
 
 def _sort_key(s: RepoStatus) -> tuple[int, int, str]:
+    if s.error:
+        changes_severity = 0
+    elif sum((s.dirty_staged, s.dirty_unstaged, s.dirty_untracked)) > 1:
+        changes_severity = 1
+    elif s.dirty_staged:
+        changes_severity = 2
+    elif s.dirty_unstaged:
+        changes_severity = 3
+    elif s.dirty_untracked:
+        changes_severity = 4
+    else:
+        changes_severity = 5
     return (
-        _DIRTY_SEVERITY.get(_dirty_symbol_plain(s), 5),
+        changes_severity,
         _sync_severity(s),
         str(s.path),
     )
@@ -495,6 +558,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "  repostatus ~/Work/hosted\n"
             "  repostatus ~/Work/*\n"
             "  repostatus . --depth 2 --fetch\n"
+            "\nSYNC compares local tracking refs for every remote. Other remotes use\n"
+            "the current branch name. A distinct push target is shown separately.\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -508,7 +573,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--fetch", "-f", action="store_true",
-        help="Run git fetch before checking sync status",
+        help="Fetch all remotes before checking sync status",
     )
     parser.add_argument(
         "--no-color", action="store_true",
@@ -523,6 +588,9 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.depth < 0:
+        print("repostatus: --depth must be non-negative", file=sys.stderr)
+        sys.exit(2)
 
     paths = args.paths if args.paths else ["."]
     dirs = resolve_paths(paths)
@@ -538,21 +606,15 @@ def main() -> None:
         return
 
     # Inspect repos in parallel — git commands are I/O-bound (network + disk)
-    max_workers = min(len(repos), max(os.cpu_count() or 2, 4))
+    max_workers = min(len(repos), 16)
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(inspect_repo, r, do_fetch=args.fetch): r for r in repos}
+        futures = {
+            pool.submit(inspect_repo, r, do_fetch=args.fetch): r
+            for r in repos
+        }
         status_map = {}
         for f in futures:
-            try:
-                status_map[f] = f.result(timeout=30 + _FETCH_TIMEOUT)
-            except concurrent.futures.TimeoutError:
-                repo_path = futures[f]
-                status_map[f] = RepoStatus(
-                    path=repo_path, branch="(timeout)",
-                    dirty_unstaged=False, dirty_staged=False,
-                    has_upstream=False, ahead=0, behind=0,
-                    error="inspection timed out",
-                )
+            status_map[f] = f.result()
     statuses = [status_map[f] for f in futures]
 
     # Sort: dirty (most severe first) → sync (most severe first) → path
