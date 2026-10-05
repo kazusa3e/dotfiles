@@ -29,5 +29,8 @@
   "tuiMode": "regular",
   "fullscreenExitOutput": "resume-hint",
   "fullscreenScrollbar": "hidden",
-  "lastChangelogVersion": "0.87.1"
+  "lastChangelogVersion": "0.99.2",
+  "defaultTools": [
+    "+codemode"
+  ]
 }
