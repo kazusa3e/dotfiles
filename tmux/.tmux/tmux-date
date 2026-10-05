@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -eu
+
+read -r month_day weekday_number < <(date '+%m/%d %u')
+weekdays=(月曜日 火曜日 水曜日 木曜日 金曜日 土曜日 日曜日)
+printf '%s %s' "$month_day" "${weekdays[weekday_number - 1]}"
