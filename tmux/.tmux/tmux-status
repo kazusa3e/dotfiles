@@ -57,8 +57,10 @@ disk_sparklines() {
   '
 }
 
-cpu=$(awk '/^avg-cpu:/ { getline; printf "%3.0f%%", 100 - $NF }' <<<"$sample")
-memory=$(awk '/MemTotal:/ { total = $2 } /MemAvailable:/ { available = $2 } END { printf "%3.0f%%", (total - available) * 100 / total }' /proc/meminfo)
+cpu_pct=$(awk '/^avg-cpu:/ { getline; printf "%.0f", 100 - $NF }' <<<"$sample")
+cpu=$(printf '%3s%%' "$cpu_pct")
+memory_pct=$(awk '/MemTotal:/ { total = $2 } /MemAvailable:/ { available = $2 } END { printf "%.0f", (total - available) * 100 / total }' /proc/meminfo)
+memory=$(printf '%3s%%' "$memory_pct")
 read -r disk_util disk_read disk_written < <(awk '
   $1 ~ /^Device/ {
     devices = 1
@@ -99,11 +101,25 @@ if [[ -z "$last_sample" || "$((now - last_sample))" -ge 10 ]]; then
 fi
 read -r read_sparkline write_sparkline < <(disk_sparklines <"$state_file")
 
-printf '#[fg=#89dceb,bold]󰈀#[nobold] %s↓%s↑#[fg=#6c7086] │ #[fg=#f9e2af,bold]󰻠#[nobold]%4s#[fg=#6c7086] │ #[fg=#fab387,bold]󰋊#[nobold]%4s R%s W%s#[fg=#6c7086] │ #[fg=#cba6f7,bold]󰍛#[nobold]%4s' \
+network_color='#89dceb'
+cpu_color='#f9e2af'
+disk_color='#fab387'
+memory_color='#cba6f7'
+(( $(awk -v read="$net_read" -v written="$net_written" 'BEGIN { print (read >= 1024 || written >= 1024) ? 1 : 0 }') )) && network_color='#f38ba8'
+(( cpu_pct >= 80 )) && cpu_color='#f38ba8'
+disk_pct=${disk_util%\%}
+(( disk_pct >= 80 )) && disk_color='#f38ba8'
+(( memory_pct >= 80 )) && memory_color='#f38ba8'
+
+printf '#[fg=%s,bold]󰈀#[nobold] %s↓ %s↑#[fg=#6c7086] │ #[fg=%s,bold]󰻠#[nobold]%4s#[fg=#6c7086] │ #[fg=%s,bold]󰋊#[nobold]%4s R%s W%s#[fg=#6c7086] │ #[fg=%s,bold]󰍛#[nobold]%4s' \
+  "$network_color" \
   "$(rate "$net_read")" \
   "$(rate "$net_written")" \
+  "$cpu_color" \
   "$cpu" \
+  "$disk_color" \
   "$disk_util" \
   "$read_sparkline" \
   "$write_sparkline" \
+  "$memory_color" \
   "$memory"
