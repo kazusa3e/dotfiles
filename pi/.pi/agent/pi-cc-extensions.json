@@ -4,7 +4,7 @@
   "diffViewMode": "auto",
   "diffIndicatorMode": "bars",
   "diffSplitMinWidth": 120,
-  "editDiffCollapsedLines": 24,
+  "editDiffCollapsedLines": 40,
   "writeDiffCollapsedLines": 0,
   "diffWordWrap": true,
   "expandedPreviewMaxLines": 40,
