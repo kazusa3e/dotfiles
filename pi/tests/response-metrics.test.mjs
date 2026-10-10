@@ -96,26 +96,61 @@ test("short, empty, buffered and tool-only responses have no rate", () => {
   }
 });
 
-test("output stays visible during thinking, while waiting has no stale rate", () => {
+test("output stays visible during thinking and subsequent waiting", () => {
   const m = new ResponseMetrics();
   m.start(0);
   m.record(delta("thinking_delta", "first"), 1000);
   m.record(delta("thinking_delta", "a".repeat(40)), 2000);
   assert.deepEqual(m.labels(), ["TTFT 1.00s", "Out ~10 tok/s"]);
   m.start(3000);
+  assert.equal(m.outputRate, undefined);
+  assert.deepEqual(m.labels(), ["TTFT …", "Out ~10 tok/s"]);
+});
+
+test("previous speed survives unsampled requests and is replaced by a new sample", () => {
+  const m = new ResponseMetrics();
+  m.start(0);
+  m.record(delta("text_delta", "first"), 1000);
+  m.record(delta("text_delta", "a".repeat(40)), 2000);
+  m.finish("stop", 2500);
+  m.prepare();
+  m.start(3000);
+  assert.deepEqual(m.labels(), ["TTFT …", "Out ~10 tok/s"]);
+  for (const type of ["thinking_start", "toolcall_start", "text_start"]) {
+    m.record({ type, contentIndex: 0 }, 3500);
+    assert.equal(m.labels()[1], "Out ~10 tok/s");
+  }
+  m.record(delta("toolcall_delta", "first"), 4000);
+  m.tool(4500);
+  assert.equal(m.labels()[1], "Out ~10 tok/s");
+  m.start(5000);
+  m.record(delta("thinking_delta", "first"), 6000);
+  assert.equal(m.labels()[1], "Out ~10 tok/s");
+  m.record(delta("thinking_delta", "a".repeat(80)), 7000);
+  assert.equal(m.outputRate, 20);
+  assert.equal(m.labels()[1], "Out ~20 tok/s");
+  m.record({ type: "toolcall_start", contentIndex: 1 }, 7500);
+  assert.equal(m.labels()[1], "Out ~20 tok/s");
+  m.tool(8000);
+  assert.equal(m.labels()[1], "Out ~20 tok/s");
+  m.start(9000);
+  assert.equal(m.labels()[1], "Out ~20 tok/s");
+  m.reset();
+  m.start(10000);
   assert.deepEqual(m.labels(), ["TTFT …", "Out — (waiting)"]);
 });
 
-test("a retry/new request clears all previous samples", () => {
+test("a retry/new request clears samples but keeps the previous displayed speed", () => {
   const m = new ResponseMetrics();
   m.start(0);
   m.record(delta("text_delta", "first"), 1000);
   m.record(delta("text_delta", "abcd"), 2000);
   m.start(10000);
-  assert.deepEqual(m.labels(), ["TTFT …", "Out — (waiting)"]);
+  assert.deepEqual(m.labels(), ["TTFT …", "Out ~1 tok/s"]);
   assert.equal(m.outputRate, undefined);
   m.record(delta("thinking_delta", "new"), 10500);
   assert.equal(m.ttftSeconds, 0.5);
+  assert.equal(m.labels()[1], "Out ~1 tok/s");
 });
 
 for (const reason of ["aborted", "error"]) {
@@ -185,10 +220,12 @@ test("integration: request boundary, tool isolation, follow-up reset and final u
   h.emit("turn_end", { outcome: "completed" }, 30000);
   h.emit("turn_start", {}, 40000);
   assert.equal(h.statuses.get(TTFT_KEY), "TTFT …");
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
   h.emit("before_provider_request", {}, 45000);
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
   h.output("thinking_delta", "reasoning", 45500);
   assert.equal(h.statuses.get(TTFT_KEY), "TTFT 0.50s");
-  assert.equal(h.statuses.get(OUTPUT_KEY), "Out — (thinking)");
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
 });
 
 test("phase changes and final values bypass render throttling", t => {
@@ -213,12 +250,16 @@ test("turn cancellation during tools is explicit", t => {
   assert.equal(h.statuses.get(OUTPUT_KEY), "Out — (aborted)");
 });
 
-for (const event of ["session_start", "model_select", "session_before_switch", "session_before_fork", "session_before_tree"]) {
+for (const event of ["session_start", "agent_start", "model_select", "session_before_switch", "session_before_fork", "session_before_tree"]) {
   test(`${event} clears stale measurements`, t => {
     const h = harness(t);
     h.emit("turn_start");
     h.emit("before_provider_request");
     h.output("text_delta", "first", 1000);
+    h.output("text_delta", "a".repeat(40), 2000);
+    h.emit("turn_end", { outcome: "completed" }, 3000);
+    h.emit("turn_start", {}, 4000);
+    assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
     h.emit(event);
     assert.equal(h.statuses.get(TTFT_KEY), "TTFT —");
     assert.equal(h.statuses.get(OUTPUT_KEY), "Out —");

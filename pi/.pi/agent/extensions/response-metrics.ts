@@ -28,6 +28,7 @@ export class ResponseMetrics {
   private firstDelta: number | undefined;
   private lastDelta: number | undefined;
   private generatedTokens = 0;
+  private previousOutputRate: number | undefined;
   private accepting = false;
 
   reset(): void {
@@ -38,11 +39,15 @@ export class ResponseMetrics {
     this.firstDelta = undefined;
     this.lastDelta = undefined;
     this.generatedTokens = 0;
+    this.previousOutputRate = undefined;
     this.accepting = false;
   }
 
   prepare(): void {
+    const rate = this.outputRate ?? this.previousOutputRate;
     this.reset();
+    // Preserve the display across requests without reusing their samples.
+    this.previousOutputRate = rate;
     this.phase = "waiting";
   }
 
@@ -116,13 +121,13 @@ export class ResponseMetrics {
     const ttft = this.ttftSeconds;
     const latency = ttft === undefined
       ? (this.phase === "waiting" ? "…" : "—") : `${ttft.toFixed(2)}s`;
-    const rate = this.outputRate;
+    const rate = this.outputRate ?? this.previousOutputRate;
     const state = {
       idle: "", waiting: "waiting", thinking: "thinking", toolcall: "tool call",
       text: "sampling", done: "", tool: "tool", aborted: "aborted", error: "error",
     }[this.phase];
     const showRate = rate !== undefined
-      && this.phase !== "idle" && this.phase !== "waiting"
+      && this.phase !== "idle"
       && this.phase !== "aborted" && this.phase !== "error";
     const output = showRate ? `~${Math.round(rate)} tok/s` : `—${state ? ` (${state})` : ""}`;
     return [`TTFT ${latency}`, `Out ${output}`];
