@@ -11,7 +11,7 @@
       ]
     }
   ],
-  "theme": "system",
+  "theme": "soft-indigo",
   "enableSkillCommands": true,
   "enableInstallTelemetry": false,
   "steeringMode": "all",
