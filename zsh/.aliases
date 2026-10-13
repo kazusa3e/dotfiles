@@ -17,6 +17,9 @@ alias gpl="git pull"
 alias gcn="git clean -fd && git reset --hard HEAD"
 alias gg="lazygit"
 
+# tldr
+alias doc="tldr --list | fzf | xargs tldr"
+
 # tmux
 function t () {
     p=${PWD##*/}
