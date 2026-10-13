@@ -1,5 +1,7 @@
 {
-    "app.message.followUp": [
-        "ctrl+n"
-    ]
+    "app.message.followUp": [ "ctrl+n" ],
+    "tui.altScreen.halfPageUp": [ "ctrl+u" ],
+    "tui.altScreen.halfPageDown": [ "ctrl+d" ],
+    "tui.altScreen.previousPrompt": [ "ctrl+[" ],
+    "tui.altScreen.nextPrompt": [ "ctrl+]" ]
 }
