@@ -24,6 +24,8 @@
   "enableWorkingMessage": true,
   "enableAliases": true,
   "enableCustomFooter": true,
+  "footerTokenRate": false,
+  "footerTokenRateTtft": false,
   "footerNerdIcons": true,
   "footerHiddenKeys": [],
   "footerLine1Keys": [

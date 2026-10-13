@@ -31,7 +31,8 @@ export class ResponseMetrics {
   private previousOutputRate: number | undefined;
   private accepting = false;
 
-  reset(): void {
+  reset(preserveOutputRate = false): void {
+    const rate = preserveOutputRate ? this.outputRate ?? this.previousOutputRate : undefined;
     this.phase = "idle";
     this.requestStart = undefined;
     this.requestEnd = undefined;
@@ -39,15 +40,13 @@ export class ResponseMetrics {
     this.firstDelta = undefined;
     this.lastDelta = undefined;
     this.generatedTokens = 0;
-    this.previousOutputRate = undefined;
+    this.previousOutputRate = rate;
     this.accepting = false;
   }
 
   prepare(): void {
-    const rate = this.outputRate ?? this.previousOutputRate;
-    this.reset();
     // Preserve the display across requests without reusing their samples.
-    this.previousOutputRate = rate;
+    this.reset(true);
     this.phase = "waiting";
   }
 
@@ -122,14 +121,9 @@ export class ResponseMetrics {
     const latency = ttft === undefined
       ? (this.phase === "waiting" ? "…" : "—") : `${ttft.toFixed(2)}s`;
     const rate = this.outputRate ?? this.previousOutputRate;
-    const state = {
-      idle: "", waiting: "waiting", thinking: "thinking", toolcall: "tool call",
-      text: "sampling", done: "", tool: "tool", aborted: "aborted", error: "error",
-    }[this.phase];
-    const showRate = rate !== undefined
-      && this.phase !== "idle"
-      && this.phase !== "aborted" && this.phase !== "error";
-    const output = showRate ? `~${Math.round(rate)} tok/s` : `—${state ? ` (${state})` : ""}`;
+    const failed = this.phase === "aborted" || this.phase === "error";
+    const output = failed ? `— (${this.phase})`
+      : rate === undefined ? "—" : `~${Math.round(rate)} tok/s`;
     return [`TTFT ${latency}`, `Out ${output}`];
   }
 }
@@ -219,18 +213,18 @@ export default function (pi: ExtensionAPI) {
       timer.unref?.();
     }
   };
-  const reset = (_event: unknown, ctx: ExtensionContext) => {
+  const reset = (_event: unknown, ctx: ExtensionContext, preserveOutputRate = false) => {
     stopTimer();
     turnActive = false;
     toolBatchStarted = false;
-    metrics.reset();
+    metrics.reset(preserveOutputRate);
     tools.reset();
     previous = [];
     publish(ctx, true);
   };
 
   pi.on("session_start", reset);
-  pi.on("agent_start", reset);
+  pi.on("agent_start", (event, ctx) => reset(event, ctx, true));
   pi.on("model_select", reset);
   pi.on("session_before_switch", reset);
   pi.on("session_before_fork", reset);

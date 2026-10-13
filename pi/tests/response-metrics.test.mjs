@@ -96,6 +96,21 @@ test("short, empty, buffered and tool-only responses have no rate", () => {
   }
 });
 
+test("unsampled output has no phase suffix", () => {
+  const m = new ResponseMetrics();
+  assert.equal(m.labels()[1], "Out —");
+  m.start(0);
+  assert.equal(m.labels()[1], "Out —");
+  for (const type of ["thinking_start", "toolcall_start", "text_start"]) {
+    m.record({ type, contentIndex: 0 }, 100);
+    assert.equal(m.labels()[1], "Out —", type);
+  }
+  m.record(delta("text_delta", "first"), 200);
+  assert.equal(m.labels()[1], "Out —");
+  m.tool(300);
+  assert.equal(m.labels()[1], "Out —");
+});
+
 test("output stays visible during thinking and subsequent waiting", () => {
   const m = new ResponseMetrics();
   m.start(0);
@@ -137,7 +152,7 @@ test("previous speed survives unsampled requests and is replaced by a new sample
   assert.equal(m.labels()[1], "Out ~20 tok/s");
   m.reset();
   m.start(10000);
-  assert.deepEqual(m.labels(), ["TTFT …", "Out — (waiting)"]);
+  assert.deepEqual(m.labels(), ["TTFT …", "Out —"]);
 });
 
 test("a retry/new request clears samples but keeps the previous displayed speed", () => {
@@ -250,7 +265,51 @@ test("turn cancellation during tools is explicit", t => {
   assert.equal(h.statuses.get(OUTPUT_KEY), "Out — (aborted)");
 });
 
-for (const event of ["session_start", "agent_start", "model_select", "session_before_switch", "session_before_fork", "session_before_tree"]) {
+test("new prompts preserve speed but reset request and tool measurements", t => {
+  const h = harness(t);
+  h.emit("session_start");
+  h.emit("agent_start");
+  h.emit("turn_start");
+  h.emit("before_provider_request");
+  h.output("text_delta", "first", 1000);
+  h.output("text_delta", "a".repeat(40), 2000);
+  h.emit("message_end", { message: { role: "assistant", stopReason: "toolUse" } }, 2500);
+  h.emit("tool_execution_start", { toolCallId: "a" }, 3000);
+  assert.equal(h.timers.size, 1);
+
+  h.emit("agent_start", {}, 4000);
+  assert.equal(h.timers.size, 0);
+  assert.equal(h.statuses.get(TTFT_KEY), "TTFT —");
+  assert.equal(h.statuses.get(REQUEST_KEY), "Req —");
+  assert.equal(h.statuses.get(TOOL_KEY), undefined);
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
+  h.output("text_delta", "outside turn", 4500);
+  assert.equal(h.statuses.get(TTFT_KEY), "TTFT —");
+  h.emit("turn_start", {}, 5000);
+  h.emit("before_provider_request");
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
+  h.output("thinking_delta", "first", 6000);
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
+  h.emit("message_end", { message: { role: "assistant", stopReason: "stop" } }, 6500);
+  h.emit("turn_end", { outcome: "completed" });
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
+
+  h.emit("agent_start", {}, 7000);
+  h.emit("turn_start");
+  h.emit("before_provider_request");
+  h.output("thinking_delta", "first", 8000);
+  h.output("thinking_delta", "a".repeat(4), 8100);
+  h.tick(8250);
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~10 tok/s");
+  h.output("thinking_delta", "a".repeat(76), 9000);
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~20 tok/s");
+  h.emit("message_end", { message: { role: "assistant", stopReason: "stop" } }, 9500);
+  h.emit("turn_end", { outcome: "completed" });
+  h.emit("agent_start", {}, 10000);
+  assert.equal(h.statuses.get(OUTPUT_KEY), "Out ~20 tok/s");
+});
+
+for (const event of ["session_start", "model_select", "session_before_switch", "session_before_fork", "session_before_tree"]) {
   test(`${event} clears stale measurements`, t => {
     const h = harness(t);
     h.emit("turn_start");
