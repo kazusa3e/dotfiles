@@ -28,6 +28,11 @@ config.initial_cols = 120
 config.initial_rows = 30
 
 config.color_scheme = 'Edge Dark (base16)'
+config.colors = {
+    cursor_bg = '#FF79C6',
+    cursor_fg = '#1E2127',
+    cursor_border = '#FF79C6',
+}
 config.cursor_blink_rate = 0
 
 config.font = wezterm.font_with_fallback {
