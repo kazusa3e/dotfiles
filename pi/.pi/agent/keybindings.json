@@ -2,6 +2,8 @@
     "app.message.followUp": [ "ctrl+n" ],
     "tui.altScreen.halfPageUp": [ "ctrl+u" ],
     "tui.altScreen.halfPageDown": [ "ctrl+d" ],
-    "tui.altScreen.previousPrompt": [ "ctrl+[" ],
-    "tui.altScreen.nextPrompt": [ "ctrl+]" ]
+    "tui.altScreen.previousPrompt": [ "ctrl+k" ],
+    "tui.altScreen.nextPrompt": [ "ctrl+j" ],
+    "tui.input.newLine": [ "ctrl+r" ],
+    "tui.editor.deleteToLineEnd": []
 }
