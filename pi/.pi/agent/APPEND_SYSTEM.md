@@ -16,7 +16,7 @@ When referring to a file in a response, always format it as an inline-code `path
 
 # Nix packages
 
-A Nix daemon is available in the environment. Prefer the project's existing development environment. When a temporary package is needed outside it, use `nix-shell -p pkg` rather than installing it permanently.
+A Nix daemon is available in the environment. Prefer the project's existing flake-based development environment via `nix develop`. When a temporary package is needed outside it, use `nix shell nixpkgs#pkg` rather than installing it permanently.
 
 # Implementation workflow
 
