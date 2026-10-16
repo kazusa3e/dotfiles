@@ -180,10 +180,9 @@ colorscheme default                     " set colorscheme to default
 
 augroup SharedAppearance
   autocmd!
-  autocmd VimEnter * highlight Normal guibg=NONE
-if has('nvim')
-  autocmd VimEnter * highlight NormalFloat guibg=NONE
-endif
+  if !has('nvim')
+    autocmd VimEnter * highlight Normal guibg=NONE
+  endif
 augroup END
 " }}}
 
