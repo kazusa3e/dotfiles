@@ -2,6 +2,8 @@
 name: todo
 description: "Track multi-step tasks with a checklist updated at the end of every reply. Load proactively when you judge that a task needs multiple steps, or when the user asks for a todo list or progress tracking."
 disable-model-invocation: false
+metadata:
+  opencode/autoinvoke: "true"
 ---
 
 # Todo

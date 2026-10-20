@@ -10,7 +10,7 @@ metadata:
 
 # Tmux Pane Control
 
-Use `scripts/tmux-pane`; it only permits panes in the current window and rejects the agent's pane.
+Use `scripts/tmux-pane`; it only permits panes in the current window and rejects the agent's own pane.
 
 ```bash
 scripts/tmux-pane list
@@ -19,12 +19,12 @@ scripts/tmux-pane send <pane> <literal-text>
 scripts/tmux-pane key <pane> <tmux-key>...
 ```
 
-`send` types literal text without pressing Enter. Use `key <pane> Enter` only when the user explicitly requests submission.
+`send` types literal text without Enter; use `key <pane> Enter` only when the user explicitly requests submission.
 
 ## Rules
 
-- Reading with `list` and `capture` is allowed. Sending text or keys requires an explicit current user request.
-- Capture the pane before acting. Make one input action at a time, then capture it again to confirm the program state.
-- Do not guess at TUI menus, alternate-screen programs, password prompts, confirmation dialogs, or destructive actions. Ask the user when the intended input is unclear.
-- Do not paste multi-step command sequences into an interactive program. Send the smallest requested input and wait for its result.
+- `list` and `capture` are allowed; sending text or keys requires an explicit current user request.
+- Capture before acting; one input action at a time, then capture again to confirm the program state.
+- Never guess at TUI menus, alternate-screen programs, password prompts, confirmation dialogs, or destructive actions — ask instead.
+- No multi-step command sequences into interactive programs; send the smallest requested input and wait.
 - Do not create, close, resize, select, or otherwise manage panes or windows.

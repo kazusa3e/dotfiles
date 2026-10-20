@@ -9,8 +9,11 @@ metadata:
 
 # Grilling
 
-Use the accompanying request as the subject. If it is missing, ask what to examine.
-
-Treat the subject as a tree of decisions. In each round, ask the material questions whose prerequisites are already settled. Number the questions and include a recommended answer with a brief reason for each. Research checkable facts from the project or available tools yourself; ask the user to decide preferences and trade-offs.
-
-After each reply, update the decision tree and ask the next useful round. Do not ask questions that depend on unanswered questions from the same round. When no material branch remains, summarize the decisions, unresolved choices, and scope, then confirm that the summary matches the user's intent. Leave implementation to a later explicit request.
+- Use the accompanying plan, design, decision, or idea; ask for the subject if missing.
+- Map consequential decisions and their dependencies as a tree.
+- Ask independent, answerable questions in rounds; prerequisites must already be settled.
+- Number each question and include a recommended answer with a brief reason.
+- Investigate checkable facts yourself; leave preferences and trade-offs to the user.
+- Wait for answers, update the tree, then ask the next round. Never depend on same-round answers.
+- When no material branch remains, summarize decisions, open choices, and scope; confirm the user's intent.
+- Implement only after an explicit user request.

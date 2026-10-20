@@ -9,14 +9,11 @@ metadata:
 
 # Explain
 
-Use the user's accompanying request as the topic. If none was supplied, ask what they want explained. Ask one concise clarifying question when the topic is genuinely ambiguous.
+Topic is the accompanying request. If missing or genuinely ambiguous, ask one concise clarifying question.
 
-Match the user's language and level while retaining useful canonical terms. Give a clear, self-contained explanation that covers:
+Match the user's language and level while keeping canonical terms. Cover only what adds value:
+- Concept: meaning, distinguishing properties, common points of confusion.
+- Background: the problem it solves, relevant history.
+- Trade-offs: when it helps or hurts; when a simpler approach is better.
 
-- Concept: what it means, its distinguishing properties, and likely points of confusion.
-- Background: the problem it addresses and relevant historical context.
-- Trade-offs: concrete situations where it helps or hurts, and when a simpler approach is preferable.
-
-Include only sections that add useful information; use headings when they make the answer easier to scan. Add an example or further reading only when it materially helps.
-
-Research recent, niche, uncertain, or specific historical claims, and cite sources used. End when the explanation is complete.
+Use headings only when they aid scanning. Add an example or further reading only when it materially helps. Research recent, niche, uncertain, or specific historical claims and cite sources.
