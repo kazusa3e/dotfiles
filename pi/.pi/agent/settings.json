@@ -29,7 +29,7 @@
   "tuiMode": "fullscreen",
   "fullscreenExitOutput": "resume-hint",
   "fullscreenScrollbar": "hidden",
-  "fullscreenWheelScorllLines": 10,
+  "fullscreenWheelScrollLines": 10,
   "lastChangelogVersion": "1.2.0",
   "defaultTools": [
     "+codemode"
