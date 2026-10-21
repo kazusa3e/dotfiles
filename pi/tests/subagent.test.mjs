@@ -16,7 +16,7 @@ const jiti = createJiti(import.meta.url, {
 	},
 });
 const { Container, stripTerminalSequences, visibleWidth } = await import(pathToFileURL(`${root}/node_modules/@earendil-works/pi-tui/dist/index.js`));
-const { CustomMessageComponent, initTheme } = await import(pathToFileURL(`${root}/dist/index.js`));
+const { CustomMessageComponent, getMarkdownTheme, initTheme } = await import(pathToFileURL(`${root}/dist/index.js`));
 const { theme } = await import(pathToFileURL(`${root}/dist/modes/interactive/theme/theme.js`));
 const {
 	default: extension,
@@ -185,6 +185,29 @@ test("formatCompactToolCall renders one-line summaries", () => {
 	assert.equal(formatCompactToolCall("webfetch", { url: long }).length, 89);
 });
 
+test("read summaries format optional line ranges and ignore malformed values", () => {
+	for (const [offset, limit, range] of [
+		[undefined, undefined, ""],
+		[null, null, ""],
+		[undefined, 20, ":1-20"],
+		[null, "20", ":1-20"],
+		[10, undefined, ":10"],
+		["10", null, ":10"],
+		[" 10 ", "20", ":10-29"],
+		[1, 1, ":1-1"],
+		["invalid", 20, ""],
+		[10, "invalid", ""],
+		["", 20, ""],
+		[10, " ", ""],
+		[NaN, 20, ""],
+		[10, Infinity, ""],
+		[false, 20, ""],
+		[10, [], ""],
+	]) {
+		assert.equal(formatCompactToolCall("read", { path: "src/a.ts", offset, limit }), `read src/a.ts${range}`);
+	}
+});
+
 test("buildInjectedContent renders success with compact tool calls", () => {
 	const text = buildInjectedContent({
 		kind: "worker",
@@ -341,7 +364,7 @@ test("running widget renders through the TUI container and clears on completion"
 	assert.deepEqual(sent[0][1], { triggerTurn: true, deliverAs: "followUp" });
 });
 
-function toolHarness(t, config = {}) {
+function toolHarness(t, config = {}, factory = extension) {
 	const renderers = new Map();
 	const handlers = new Map();
 	const commands = new Map();
@@ -360,7 +383,7 @@ function toolHarness(t, config = {}) {
 		registerMessageRenderer: (name, renderer) => renderers.set(name, renderer),
 		sendMessage: (message, options) => sent.push({ message, options }),
 	};
-	extension(pi, options => new Promise((resolve, reject) => runs.push({ options, resolve, reject })), {
+	factory(pi, options => new Promise((resolve, reject) => runs.push({ options, resolve, reject })), {
 		...DEFAULT_SUBAGENT_CONFIG, ...config,
 		display: { ...DEFAULT_SUBAGENT_CONFIG.display, ...config.display },
 	});
@@ -375,6 +398,43 @@ const completed = (text = "Done") => ({
 	messages: [{ role: "assistant", content: [{ type: "text", text }] }],
 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
+
+for (const injectedToolCalls of ["compact", "none"]) {
+	test(`read results inject without Pi's formatReadLineRange export: ${injectedToolCalls}`, async t => {
+		const compatJiti = createJiti(import.meta.url, {
+			moduleCache: false,
+			fsCache: false,
+			virtualModules: {
+				"@earendil-works/pi-coding-agent": { getMarkdownTheme },
+			},
+			alias: {
+				"@earendil-works/pi-ai": `${root}/node_modules/@earendil-works/pi-ai/dist/index.js`,
+				"@earendil-works/pi-tui": `${root}/node_modules/@earendil-works/pi-tui/dist/index.js`,
+			},
+		});
+		const compat = await compatJiti.import("../.pi/agent/extensions/subagent.ts");
+		const h = toolHarness(t, { injectedToolCalls, maxConcurrent: 1 }, compat.default);
+		for (const task of ["read a file", "next queued task"]) {
+			await h.tools.get("subagent").execute("call", { task }, undefined, undefined, h.ctx);
+		}
+		const result = completed("READ_RESULT_SENTINEL");
+		result.messages.unshift({ role: "assistant", content: [{
+			type: "toolCall", name: "read", arguments: { path: "src/a.ts", offset: 10, limit: 20 },
+		}] });
+		h.runs[0].resolve(result);
+		await flush();
+		assert.equal(h.sent.length, 1);
+		assert.equal(h.sent[0].message.details.failed, false);
+		assert.match(h.sent[0].message.content, /READ_RESULT_SENTINEL/);
+		assert.equal(h.sent[0].message.content.includes("read src/a.ts:10-29"), injectedToolCalls === "compact");
+		assert.deepEqual(h.sent[0].message.details.toolCalls, ["read src/a.ts:10-29"]);
+		assert.equal(h.runs.length, 2);
+		h.runs[1].resolve(completed("NEXT_RESULT_SENTINEL"));
+		await flush();
+		assert.equal(h.sent.length, 2);
+		assert.match(h.sent[1].message.content, /NEXT_RESULT_SENTINEL/);
+	});
+}
 
 test("ampersand input is consumed without starting a duplicate main-agent request", async t => {
 	const h = toolHarness(t);

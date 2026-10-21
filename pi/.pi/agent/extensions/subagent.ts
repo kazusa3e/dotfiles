@@ -32,7 +32,7 @@ import { homedir } from "node:os";
 import * as path from "node:path";
 import { Type, type Message } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { formatReadLineRange, getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Box, Markdown, Text, TruncatedText } from "@earendil-works/pi-tui";
 
 // ── config ─────────────────────────────────────────────────────────────────
@@ -248,6 +248,22 @@ export function parseToolArgs(args: unknown): Record<string, unknown> {
 	} catch {
 		return {};
 	}
+}
+
+// Keep read summaries independent of Pi's version-specific formatting exports.
+function formatReadLineRange(offset: unknown, limit: unknown): string {
+	if (offset == null && limit == null) return "";
+	const parseLine = (value: unknown): number | undefined => {
+		const number = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+		return typeof number === "number" && Number.isFinite(number) ? number : undefined;
+	};
+	const start = offset == null ? 1 : parseLine(offset);
+	if (start === undefined) return "";
+	if (limit == null) return `:${start}`;
+	const count = parseLine(limit);
+	if (count === undefined) return "";
+	const end = start + count - 1;
+	return `:${start}${end ? `-${end}` : ""}`;
 }
 
 /** One-line summaries for tool calls in the injected result. */
