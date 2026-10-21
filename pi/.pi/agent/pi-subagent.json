@@ -1,7 +1,11 @@
 {
   "maxConcurrent": 8,
-  "model": null,
+  "model": "openai-codex/gpt-6-luna",
   "thinking": null,
-  "statusBar": "lines",
-  "injectedToolCalls": "compact"
+  "injectedToolCalls": "compact",
+  "display": {
+    "statusBar": "lines",
+    "toolCalls": "expanded",
+    "finalResponse": "expanded"
+  }
 }

@@ -20,8 +20,10 @@
  *   - maxConcurrent (default 8): running cap; extra jobs queue FIFO.
  *   - model / thinking (default null): override the inherited main-agent model
  *     and thinking level for workers.
- *   - statusBar: "lines" (default) | "oneline" | "hidden"
- *   - injectedToolCalls: "compact" (default) | "none"
+ *   - injectedToolCalls: "compact" (default) | "none" (model context only)
+ *   - display.statusBar: "lines" (default) | "oneline" | "hidden"
+ *   - display.toolCalls / display.finalResponse: "always" | "expanded" (default)
+ *     | "never". Ctrl+o toggles result details without changing model context.
  */
 
 import { spawn } from "node:child_process";
@@ -30,9 +32,12 @@ import { homedir } from "node:os";
 import * as path from "node:path";
 import { Type, type Message } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { formatReadLineRange } from "@earendil-works/pi-coding-agent";
+import { formatReadLineRange, getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import { Box, Markdown, Text, TruncatedText } from "@earendil-works/pi-tui";
 
 // ── config ─────────────────────────────────────────────────────────────────
+
+export type ResultVisibility = "always" | "expanded" | "never";
 
 export interface SubagentConfig {
 	/** Max simultaneously running subagents; the rest queue FIFO. */
@@ -41,23 +46,31 @@ export interface SubagentConfig {
 	model: string | null;
 	/** Override thinking level for workers; null inherits the main agent. */
 	thinking: string | null;
-	/** Status bar mode below the editor. */
-	statusBar: "lines" | "oneline" | "hidden";
-	/** Tool-call lines in the injected result message. */
+	/** Tool-call lines in the model-facing result; independent of display settings. */
 	injectedToolCalls: "compact" | "none";
+	display: {
+		statusBar: "lines" | "oneline" | "hidden";
+		toolCalls: ResultVisibility;
+		finalResponse: ResultVisibility;
+	};
 }
 
 export const DEFAULT_SUBAGENT_CONFIG: SubagentConfig = {
 	maxConcurrent: 8,
 	model: null,
 	thinking: null,
-	statusBar: "lines",
 	injectedToolCalls: "compact",
+	display: {
+		statusBar: "lines",
+		toolCalls: "expanded",
+		finalResponse: "expanded",
+	},
 };
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 const STATUS_BAR_MODES = ["lines", "oneline", "hidden"] as const;
 const INJECTED_TOOL_MODE = ["compact", "none"] as const;
+const RESULT_VISIBILITY_MODES = ["always", "expanded", "never"] as const;
 
 function pickInt(value: unknown, fallback: number, min: number, max: number): number {
 	const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
@@ -73,6 +86,11 @@ function pickEnum<T extends string>(value: unknown, allowed: readonly T[], fallb
 
 export function normalizeSubagentConfig(input: unknown): SubagentConfig {
 	const source = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+	const display = (source.display && typeof source.display === "object" ? source.display : {}) as Record<string, unknown>;
+	// Keep existing personal configs working while display settings move into one group.
+	const legacyFinal = source.finalResponse === "show"
+		? "always"
+		: source.finalResponse === "hidden" ? "never" : source.finalResponse;
 	return {
 		maxConcurrent: pickInt(source.maxConcurrent, DEFAULT_SUBAGENT_CONFIG.maxConcurrent, 1, 64),
 		model: typeof source.model === "string" && source.model.trim() ? source.model.trim() : null,
@@ -80,12 +98,24 @@ export function normalizeSubagentConfig(input: unknown): SubagentConfig {
 			typeof source.thinking === "string"
 				? (pickEnum(source.thinking, THINKING_LEVELS, "high") as string)
 				: null,
-		statusBar: pickEnum(source.statusBar, STATUS_BAR_MODES, DEFAULT_SUBAGENT_CONFIG.statusBar),
 		injectedToolCalls: pickEnum(
 			source.injectedToolCalls,
 			INJECTED_TOOL_MODE,
 			DEFAULT_SUBAGENT_CONFIG.injectedToolCalls,
 		),
+		display: {
+			statusBar: pickEnum(
+				display.statusBar === undefined ? source.statusBar : display.statusBar,
+				STATUS_BAR_MODES,
+				DEFAULT_SUBAGENT_CONFIG.display.statusBar,
+			),
+			toolCalls: pickEnum(display.toolCalls, RESULT_VISIBILITY_MODES, DEFAULT_SUBAGENT_CONFIG.display.toolCalls),
+			finalResponse: pickEnum(
+				display.finalResponse === undefined ? legacyFinal : display.finalResponse,
+				RESULT_VISIBILITY_MODES,
+				DEFAULT_SUBAGENT_CONFIG.display.finalResponse,
+			),
+		},
 	};
 }
 
@@ -102,7 +132,7 @@ export function loadSubagentConfig(): SubagentConfig {
 	} catch {
 		// Ignore bad config and fall back to defaults.
 	}
-	return { ...DEFAULT_SUBAGENT_CONFIG };
+	return normalizeSubagentConfig(undefined);
 }
 
 // ── `&` trigger parsing ─────────────────────────────────────────────────────
@@ -293,20 +323,34 @@ export interface InjectedSummary {
 	elapsedMs: number;
 	finalText?: string;
 	toolCalls: { name: string; args: unknown }[];
+	toolCallCount?: number;
 	toolCallMode: "compact" | "none";
 }
 
-/** Text sent back into the main agent's session when a subagent finishes. */
-export function buildInjectedContent(summary: InjectedSummary): string {
+interface ResultDetails {
+	headerText: string;
+	task: string;
+	toolCalls: string[];
+	toolCallCount: number;
+	finalText: string;
+	failed: boolean;
+	reason?: string;
+}
+
+function buildResultHeader(summary: InjectedSummary): string {
 	const stats: string[] = [];
 	if (summary.turns > 0) stats.push(`${summary.turns} turn${summary.turns === 1 ? "" : "s"}`);
 	const usage = summary.usage;
 	if (usage.input || usage.output) stats.push(`↑${formatTokens(usage.input)} ↓${formatTokens(usage.output)}`);
 	if (usage.cost > 0) stats.push(`$${usage.cost.toFixed(4)}`);
-	if (stats.length > 0) stats.push(formatElapsed(summary.elapsedMs));
+	stats.push(formatElapsed(summary.elapsedMs));
 	const jobLabel = summary.jobId === undefined ? "" : ` #${summary.jobId}`;
-	const head = `[subagent ${summary.kind}${jobLabel}] ${summary.failed ? "failed" : "done"}${stats.length ? ` · ${stats.join(" · ")}` : ""}`;
+	return `[subagent ${summary.kind}${jobLabel}] ${summary.failed ? "failed" : "done"} · ${stats.join(" · ")}`;
+}
 
+/** Text sent back into the main agent's session when a subagent finishes. */
+export function buildInjectedContent(summary: InjectedSummary): string {
+	const head = buildResultHeader(summary);
 	if (summary.failed) {
 		const reason = (summary.reason ?? "").replace(/\s+/g, " ").trim();
 		return reason ? `${head}\n\n→ ${collapseToolText(reason, 400)}` : head;
@@ -314,6 +358,9 @@ export function buildInjectedContent(summary: InjectedSummary): string {
 	const parts: string[] = [head];
 	if (summary.toolCallMode === "compact" && summary.toolCalls.length > 0) {
 		parts.push("", ...summary.toolCalls.map((call) => `→ ${formatCompactToolCall(call.name, call.args)}`));
+		if ((summary.toolCallCount ?? 0) > summary.toolCalls.length) {
+			parts.push(`[…showing last ${summary.toolCalls.length} of ${summary.toolCallCount} tool calls…]`);
+		}
 	}
 	const finalText = (summary.finalText ?? "").trim();
 	parts.push("", finalText ? truncateMiddle(finalText, 6000) : "(no output)");
@@ -553,9 +600,9 @@ function getFinalText(messages: Message[]): string | undefined {
 	return undefined;
 }
 
-const MAX_INJECTED_TOOL_CALLS = 10;
+const MAX_RESULT_TOOL_CALLS = 10;
 
-function getToolCalls(messages: Message[], limit = MAX_INJECTED_TOOL_CALLS): { name: string; args: unknown }[] {
+function getToolCalls(messages: Message[]): { name: string; args: unknown }[] {
 	const calls: { name: string; args: unknown }[] = [];
 	for (const msg of messages) {
 		if (msg.role !== "assistant") continue;
@@ -563,14 +610,44 @@ function getToolCalls(messages: Message[], limit = MAX_INJECTED_TOOL_CALLS): { n
 			if (part.type === "toolCall") calls.push({ name: part.name, args: part.arguments });
 		}
 	}
-	return calls.slice(-limit);
+	return calls;
 }
 
-export default function (pi: ExtensionAPI, run = runChild): void {
+export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown = loadSubagentConfig()): void {
 	// Set when spawned as a subagent child: never re-spawn, never transform.
 	const isChild = process.env.PI_SUBAGENT_CHILD === "1";
 	if (isChild) return;
-	const config = loadSubagentConfig();
+	const config = normalizeSubagentConfig(inputConfig);
+
+	pi.registerMessageRenderer<ResultDetails>("subagent-result", (message, { expanded, outputPad }, theme) => {
+		const details = message.details;
+		// Older entries lack separate display sections; retain their original content.
+		if (typeof details?.headerText !== "string") return undefined;
+		const visible = (mode: ResultVisibility) => mode === "always" || (mode === "expanded" && expanded);
+		const box = new Box(outputPad, 1, text => theme.bg("customMessageBg", text));
+		box.addChild(new Text(details.headerText, 0, 0));
+		box.addChild(expanded
+			? new Text(`Task: ${details.task}`, 0, 0)
+			: new TruncatedText(`Task: ${collapseToolText(details.task)}`, 0, 0));
+		if (details.failed) {
+			const reason = details.reason || "Unknown error";
+			box.addChild(new Text(theme.fg("error", `\nError: ${expanded ? reason : collapseToolText(reason, 160)}`), 0, 0));
+		}
+		if (visible(config.display.toolCalls) && details.toolCalls.length > 0) {
+			box.addChild(new Text(`\nTool calls:\n${details.toolCalls.map(call => `→ ${call}`).join("\n")}`, 0, 0));
+			if (details.toolCallCount > details.toolCalls.length) {
+				box.addChild(new Text(theme.fg("muted", `[…showing last ${details.toolCalls.length} of ${details.toolCallCount} tool calls…]`), 0, 0));
+			}
+		}
+		if (!details.failed && visible(config.display.finalResponse)) {
+			box.addChild(new Text("\nFinal response:", 0, 0));
+			box.addChild(new Markdown(details.finalText || "(no output)", 0, 0, getMarkdownTheme()));
+		}
+		if (!expanded) {
+			box.addChild(new Text(theme.fg("muted", "Details collapsed (Ctrl+o to expand)"), 0, 0));
+		}
+		return box;
+	});
 
 	const jobs: Job[] = [];
 	let nextJobId = 1;
@@ -591,7 +668,7 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 	};
 
 	// The spinner only matters when the status bar is visible.
-	const timerNeeded = () => config.statusBar !== "hidden";
+	const timerNeeded = () => config.display.statusBar !== "hidden";
 
 	const clearWidget = () => {
 		if (!widgetInstalled) return;
@@ -614,7 +691,7 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 						const style: StatusStyler = makeStyler(ui?.theme);
 						return buildStatusLines(
 							views.map((job) => toStatusView(job, spinnerTick)),
-							{ width, mode: config.statusBar === "oneline" ? "oneline" : "lines", style },
+							{ width, mode: config.display.statusBar === "oneline" ? "oneline" : "lines", style },
 						);
 					},
 					invalidate() {},
@@ -625,7 +702,7 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 	};
 
 	const syncWidget = () => {
-		if (!ui || config.statusBar === "hidden" || activeJobs().length === 0) {
+		if (!ui || config.display.statusBar === "hidden" || activeJobs().length === 0) {
 			clearWidget();
 			return;
 		}
@@ -715,8 +792,10 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 			else if (job.stopReason && job.stopReason !== "end") reason = `stopped: ${job.stopReason}`;
 			else if (job.exitCode !== 0) reason = result.stderr.trim() || `exit code ${job.exitCode}`;
 		}
+		reason = reason ? truncateMiddle(reason.trim(), 6000) : undefined;
 		const elapsedMs = job.runStartedAt ? Date.now() - job.runStartedAt : 0;
-		const content = buildInjectedContent({
+		const toolCalls = getToolCalls(job.messages);
+		const summary: InjectedSummary = {
 			jobId: job.id,
 			kind: job.kind,
 			failed,
@@ -724,10 +803,12 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 			turns: job.turns,
 			usage: job.usage,
 			elapsedMs,
-			finalText: getFinalText(job.messages),
-			toolCalls: getToolCalls(job.messages),
+			finalText: truncateMiddle((getFinalText(job.messages) ?? "").trim(), 6000),
+			toolCalls: toolCalls.slice(-MAX_RESULT_TOOL_CALLS),
+			toolCallCount: toolCalls.length,
 			toolCallMode: config.injectedToolCalls,
-		});
+		};
+		const content = buildInjectedContent(summary);
 		try {
 			pi.sendMessage(
 				{
@@ -735,6 +816,10 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 					content,
 					display: true,
 					details: {
+						headerText: buildResultHeader(summary),
+						toolCalls: summary.toolCalls.map(call => formatCompactToolCall(call.name, call.args)),
+						toolCallCount: toolCalls.length,
+						finalText: summary.failed ? "" : summary.finalText,
 						jobId: job.id,
 						kind: job.kind,
 						task: job.task,
@@ -810,7 +895,7 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 		},
 	});
 
-	// `&` sugar: strip the trailing ampersand and spawn in the background.
+	// Consume delegated input so the main agent does not execute the same task.
 	pi.on("input", (event, ctx) => {
 		if (isChild || event.source === "extension") return { action: "continue" };
 		const { task, triggered } = splitTrailingAmpersand(event.text);
@@ -825,7 +910,7 @@ export default function (pi: ExtensionAPI, run = runChild): void {
 		if (ctx.hasUI) {
 			ctx.ui.notify(`Subagent worker spawned in background: ${collapseTask(task)}`, "info");
 		}
-		return { action: "transform", text: task };
+		return { action: "handled" };
 	});
 
 	pi.registerCommand("subagent", {

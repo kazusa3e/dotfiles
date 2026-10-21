@@ -5,14 +5,19 @@ import { readFileSync } from "node:fs";
 
 const root = process.env.PI_PACKAGE_ROOT;
 if (!root) throw new Error("Set PI_PACKAGE_ROOT to the installed pi package directory");
+// Exercise the primary extension even when this suite is launched by a worker.
+delete process.env.PI_SUBAGENT_CHILD;
 const { createJiti } = await import(pathToFileURL(`${root}/node_modules/jiti/lib/jiti.mjs`));
 const jiti = createJiti(import.meta.url, {
 	alias: {
 		"@earendil-works/pi-coding-agent": `${root}/dist/index.js`,
 		"@earendil-works/pi-ai": `${root}/node_modules/@earendil-works/pi-ai/dist/index.js`,
+		"@earendil-works/pi-tui": `${root}/node_modules/@earendil-works/pi-tui/dist/index.js`,
 	},
 });
-const { Container } = await import(pathToFileURL(`${root}/node_modules/@earendil-works/pi-tui/dist/index.js`));
+const { Container, stripTerminalSequences, visibleWidth } = await import(pathToFileURL(`${root}/node_modules/@earendil-works/pi-tui/dist/index.js`));
+const { CustomMessageComponent, initTheme } = await import(pathToFileURL(`${root}/dist/index.js`));
+const { theme } = await import(pathToFileURL(`${root}/dist/modes/interactive/theme/theme.js`));
 const {
 	default: extension,
 	buildInjectedContent,
@@ -79,32 +84,51 @@ test("parseKindPrefix resolves known kinds and defaults unknown prefixes to work
 	assert.deepEqual(parseKindPrefix("worker:  "), { kind: "worker", task: "" });
 });
 
-test("normalizeSubagentConfig applies defaults", () => {
-	assert.deepEqual(normalizeSubagentConfig({}), { ...DEFAULT_SUBAGENT_CONFIG });
+test("normalizeSubagentConfig applies independent nested display defaults", () => {
+	assert.deepEqual(normalizeSubagentConfig({}), {
+		...DEFAULT_SUBAGENT_CONFIG,
+		display: { statusBar: "lines", toolCalls: "expanded", finalResponse: "expanded" },
+	});
 	assert.equal(normalizeSubagentConfig(undefined).maxConcurrent, 8);
 	assert.equal(normalizeSubagentConfig(null).thinking, null);
+	const first = normalizeSubagentConfig({ display: { statusBar: "hidden" } });
+	const second = normalizeSubagentConfig({});
+	assert.deepEqual(first.display, { statusBar: "hidden", toolCalls: "expanded", finalResponse: "expanded" });
+	first.display.statusBar = "oneline";
+	assert.equal(second.display.statusBar, "lines");
+	assert.equal(normalizeSubagentConfig({ display: null }).display.toolCalls, "expanded");
+	assert.equal(normalizeSubagentConfig({ display: "invalid" }).display.finalResponse, "expanded");
 });
 
-test("normalizeSubagentConfig clamps and validates values", () => {
+test("normalizeSubagentConfig validates nested modes and legacy aliases", () => {
 	const config = normalizeSubagentConfig({
 		maxConcurrent: 999,
 		model: "  provider/model  ",
 		thinking: "quantum",
-		statusBar: "weird",
 		injectedToolCalls: "everything",
+		display: { statusBar: "weird", toolCalls: "everything", finalResponse: null },
 	});
 	assert.equal(config.maxConcurrent, 64);
 	assert.equal(config.model, "provider/model");
 	assert.equal(config.thinking, "high");
-	assert.equal(config.statusBar, "lines");
+	assert.deepEqual(config.display, { statusBar: "lines", toolCalls: "expanded", finalResponse: "expanded" });
 	assert.equal(config.injectedToolCalls, "compact");
 
 	const clamped = normalizeSubagentConfig({ maxConcurrent: 0 });
 	assert.equal(clamped.maxConcurrent, 1);
 
-	const configured = normalizeSubagentConfig({ statusBar: "oneline", maxConcurrent: 3 });
-	assert.equal(configured.statusBar, "oneline");
+	const configured = normalizeSubagentConfig({ display: { statusBar: "oneline", toolCalls: "never", finalResponse: "always" }, maxConcurrent: 3 });
+	assert.deepEqual(configured.display, { statusBar: "oneline", toolCalls: "never", finalResponse: "always" });
 	assert.equal(configured.maxConcurrent, 3);
+	for (const [legacy, mode] of [["show", "always"], ["expanded", "expanded"], ["hidden", "never"]]) {
+		assert.equal(normalizeSubagentConfig({ finalResponse: legacy }).display.finalResponse, mode);
+	}
+	assert.equal(normalizeSubagentConfig({ statusBar: "oneline" }).display.statusBar, "oneline");
+	assert.deepEqual(normalizeSubagentConfig({
+		statusBar: "hidden", finalResponse: "show", display: { statusBar: null, finalResponse: null },
+	}).display, { statusBar: "lines", toolCalls: "expanded", finalResponse: "expanded" });
+	assert.deepEqual(normalizeSubagentConfig({ statusBar: "hidden", finalResponse: "show", display: { statusBar: "lines", finalResponse: "never" } }).display,
+		{ statusBar: "lines", toolCalls: "expanded", finalResponse: "never" });
 });
 
 test("formatTokens renders compact k/M units", () => {
@@ -210,6 +234,7 @@ test("buildInjectedContent renders failures with the reason", () => {
 	});
 	assert.ok(text.includes("[subagent worker] failed"));
 	assert.ok(text.includes("→ exit code 1"));
+	assert.ok(text.includes("1s"));
 });
 
 test("buildStatusLines renders one line per job with aligned columns", () => {
@@ -268,6 +293,7 @@ test("running widget renders through the TUI container and clears on completion"
 		on: (name, handler) => handlers.set(name, handler),
 		registerCommand: () => {},
 		registerTool: () => {},
+		registerMessageRenderer: () => {},
 		sendMessage: (...args) => sent.push(args),
 	};
 	const ctx = {
@@ -282,7 +308,7 @@ test("running widget renders through the TUI container and clears on completion"
 			},
 		},
 	};
-	extension(pi, run);
+	extension(pi, run, { ...DEFAULT_SUBAGENT_CONFIG });
 	t.after(() => handlers.get("session_shutdown")());
 	handlers.get("session_start")({}, ctx);
 	handlers.get("input")({ text: "inspect files &", source: "interactive" }, ctx);
@@ -315,7 +341,8 @@ test("running widget renders through the TUI container and clears on completion"
 	assert.deepEqual(sent[0][1], { triggerTurn: true, deliverAs: "followUp" });
 });
 
-function toolHarness(t) {
+function toolHarness(t, config = {}) {
+	const renderers = new Map();
 	const handlers = new Map();
 	const commands = new Map();
 	const tools = new Map();
@@ -330,12 +357,16 @@ function toolHarness(t) {
 		on: (name, handler) => handlers.set(name, handler),
 		registerCommand: (name, command) => commands.set(name, command),
 		registerTool: tool => tools.set(tool.name, tool),
+		registerMessageRenderer: (name, renderer) => renderers.set(name, renderer),
 		sendMessage: (message, options) => sent.push({ message, options }),
 	};
-	extension(pi, options => new Promise((resolve, reject) => runs.push({ options, resolve, reject })));
+	extension(pi, options => new Promise((resolve, reject) => runs.push({ options, resolve, reject })), {
+		...DEFAULT_SUBAGENT_CONFIG, ...config,
+		display: { ...DEFAULT_SUBAGENT_CONFIG.display, ...config.display },
+	});
 	handlers.get("session_start")({}, ctx);
 	t.after(() => handlers.get("session_shutdown")());
-	return { handlers, commands, tools, runs, sent, ctx };
+	return { handlers, commands, tools, renderers, runs, sent, ctx };
 }
 
 const completed = (text = "Done") => ({
@@ -344,6 +375,52 @@ const completed = (text = "Done") => ({
 	messages: [{ role: "assistant", content: [{ type: "text", text }] }],
 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
+
+test("ampersand input is consumed without starting a duplicate main-agent request", async t => {
+	const h = toolHarness(t);
+	const result = h.handlers.get("input")({ text: "北京今天天气怎么样 &", source: "interactive" }, h.ctx);
+	assert.deepEqual(result, { action: "handled" });
+	assert.equal(h.runs.length, 1);
+	assert.equal(h.runs[0].options.task, "北京今天天气怎么样");
+	assert.equal(h.sent.length, 0);
+	h.runs[0].resolve(completed("Weather result"));
+	await flush();
+	assert.equal(h.sent.length, 1);
+	assert.match(h.sent[0].message.content, /Weather result/);
+	assert.deepEqual(h.sent[0].options, { triggerTurn: true, deliverAs: "followUp" });
+});
+
+test("queued ampersand input is consumed even while the main agent is busy", async t => {
+	const h = toolHarness(t, { maxConcurrent: 1 });
+	await h.commands.get("subagent").handler("occupy worker slot", h.ctx);
+	for (const streamingBehavior of ["steer", "followUp"]) {
+		const result = h.handlers.get("input")({
+			text: `${streamingBehavior} task &`, source: "interactive", streamingBehavior,
+		}, h.ctx);
+		assert.deepEqual(result, { action: "handled" });
+	}
+	assert.equal(h.runs.length, 1);
+	assert.equal(h.sent.length, 0);
+	h.runs[0].resolve(completed());
+	await flush();
+	assert.equal(h.runs[1].options.task, "steer task");
+	h.runs[1].resolve(completed());
+	await flush();
+	assert.equal(h.runs[2].options.task, "followUp task");
+});
+
+test("ordinary and extension-injected inputs still pass through without spawning", t => {
+	const h = toolHarness(t);
+	for (const event of [
+		{ text: "normal prompt", source: "interactive" },
+		{ text: "result &", source: "extension" },
+		{ text: "```bash\necho test &", source: "interactive" },
+	]) {
+		assert.deepEqual(h.handlers.get("input")(event, h.ctx), { action: "continue" });
+	}
+	assert.deepEqual(h.handlers.get("input")({ text: " & ", source: "interactive" }, h.ctx), { action: "handled" });
+	assert.equal(h.runs.length, 0);
+});
 
 test("model tool returns a job ID before worker completion, then injects the matching result", { timeout: 2000 }, async t => {
 	const h = toolHarness(t);
@@ -414,6 +491,7 @@ test("child processes register no dispatch tool, command or input hook", () => {
 			on: (...args) => registrations.push(args),
 			registerTool: (...args) => registrations.push(args),
 			registerCommand: (...args) => registrations.push(args),
+			registerMessageRenderer: (...args) => registrations.push(args),
 		}, () => { throw new Error("A child must not dispatch"); });
 	} finally {
 		if (previous === undefined) delete process.env.PI_SUBAGENT_CHILD;
@@ -462,11 +540,200 @@ test("Pi's extension loader registers the model tool and its TypeBox schema", as
 	const extensionPath = fileURLToPath(new URL("../.pi/agent/extensions/subagent.ts", import.meta.url));
 	const result = await loadExtensions([extensionPath], "/tmp");
 	assert.deepEqual(result.errors, []);
+	assert.ok(result.extensions[0].messageRenderers.has("subagent-result"));
 	const tool = result.extensions[0].tools.get("subagent").definition;
 	assert.equal(tool.exposure, "model-only");
 	assert.equal(tool.parameters.properties.task.type, "string");
 	assert.deepEqual(tool.parameters.required, ["task"]);
 });
+
+for (const mode of ["always", "expanded", "never"]) {
+	test(`result renderer keeps failures visible in ${mode} mode`, async t => {
+		const h = toolHarness(t, { display: { finalResponse: mode } });
+		await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+		h.runs[0].resolve({ ...completed(), exitCode: 1, stopReason: "error", errorMessage: "FAILURE_REASON_SENTINEL" });
+		await flush();
+		initTheme("dark", false);
+		const message = h.sent[0].message;
+		assert.equal(message.details.failed, true);
+		assert.equal(message.details.reason, "FAILURE_REASON_SENTINEL");
+		assert.equal(message.details.finalText, "");
+		const component = new CustomMessageComponent(message, h.renderers.get("subagent-result"));
+		for (const expanded of [false, true]) {
+			component.setExpanded(expanded);
+			const text = component.render(80).map(stripTerminalSequences).join("\n");
+			assert.match(text, /FAILURE_REASON_SENTINEL/);
+			assert.doesNotMatch(text, /Done/);
+			assert.equal(text.includes("Details collapsed"), !expanded);
+			assert.match(text, /inspect/);
+		}
+	});
+}
+
+test("legacy results without headerText fall back even when summaryText exists", t => {
+	const h = toolHarness(t);
+	initTheme("dark", false);
+	const message = { customType: "subagent-result", content: "OLD_RESULT_SENTINEL", details: { jobId: 1, summaryText: "OLD_SUMMARY_SENTINEL" }, display: true };
+	const renderer = h.renderers.get("subagent-result");
+	assert.equal(renderer(message, { expanded: false, outputPad: 1 }, theme), undefined);
+	const component = new CustomMessageComponent(message, renderer);
+	const fallback = component.render(80).map(stripTerminalSequences).join("\n");
+	assert.match(fallback, /OLD_RESULT_SENTINEL/);
+	assert.doesNotMatch(fallback, /OLD_SUMMARY_SENTINEL/);
+});
+
+test("result details retain full task, capped summaries, truncation, and tool counts", async t => {
+	const task = "task ".repeat(40) + "TASK_TAIL_SENTINEL";
+	const h = toolHarness(t, { display: { toolCalls: "always", finalResponse: "always" } });
+	await h.tools.get("subagent").execute("call", { task }, undefined, undefined, h.ctx);
+	const result = completed("F".repeat(3500) + "DISCARDED_FINAL_SENTINEL" + "F".repeat(3500));
+	result.messages.unshift(...Array.from({ length: 12 }, (_, i) => ({ role: "assistant", content: [{ type: "toolCall", name: "bash", arguments: { command: `command-${i}` } }] })));
+	h.runs[0].resolve(result);
+	await flush();
+	const message = h.sent[0].message;
+	assert.equal(message.details.task, task.trim());
+	assert.match(message.details.headerText, /worker #1.*done/);
+	assert.equal(message.details.toolCallCount, 12);
+	assert.equal(message.details.toolCalls.length, 10);
+	assert.match(message.details.finalText, /truncated/i);
+	assert.ok(message.details.finalText.length <= 6000);
+	assert.doesNotMatch(message.details.finalText, /DISCARDED_FINAL_SENTINEL/);
+	assert.deepEqual(message.details.toolCalls, Array.from({ length: 10 }, (_, i) => `$ command-${i + 2}`));
+	assert.match(message.content, /showing last 10 of 12 tool calls/);
+	initTheme("dark", false);
+	const component = new CustomMessageComponent(message, h.renderers.get("subagent-result"));
+	const collapsed = component.render(80).map(stripTerminalSequences);
+	assert.doesNotMatch(collapsed.join("\n"), /TASK_TAIL_SENTINEL/);
+	assert.equal(collapsed.filter(line => line.trim().startsWith("Task:")).length, 1);
+	assert.ok(collapsed.every(line => !line.includes("task") || line.trim().startsWith("Task:")));
+	component.setExpanded(true);
+	const rendered = component.render(120).map(stripTerminalSequences).join("\n");
+	assert.match(rendered, /truncated/i);
+	assert.match(rendered, /showing last 10 of 12 tool calls/);
+	assert.match(rendered, /TASK_TAIL_SENTINEL/);
+	assert.doesNotMatch(rendered, /DISCARDED_FINAL_SENTINEL/);
+});
+
+test("default expansion hides result sections without retaining raw tool output or thinking", async t => {
+	const h = toolHarness(t);
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	const result = completed("DEFAULT_FINAL_SENTINEL");
+	result.messages.unshift(
+		{ role: "assistant", content: [
+			{ type: "thinking", thinking: "PRIVATE_THINKING_SENTINEL" },
+			{ type: "toolCall", name: "bash", arguments: { command: "ls src" } },
+		] },
+		{ role: "toolResult", content: [{ type: "text", text: "RAW_OUTPUT_SENTINEL" }] },
+	);
+	h.runs[0].resolve(result);
+	await flush();
+	initTheme("dark", false);
+	const message = h.sent[0].message;
+	assert.doesNotMatch(JSON.stringify(message), /PRIVATE_THINKING_SENTINEL|RAW_OUTPUT_SENTINEL/);
+	const component = new CustomMessageComponent(message, h.renderers.get("subagent-result"));
+	for (const expanded of [false, true, false]) {
+		component.setExpanded(expanded);
+		const text = component.render(80).map(stripTerminalSequences).join("\n");
+		assert.equal(text.includes("DEFAULT_FINAL_SENTINEL"), expanded);
+		assert.equal(text.includes("$ ls src"), expanded);
+	}
+	assert.match(message.content, /DEFAULT_FINAL_SENTINEL/);
+	assert.match(message.content, /\$ ls src/);
+});
+
+test("expansion reveals retained failure details and tool summaries without restoring truncated text", async t => {
+	const h = toolHarness(t);
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	const result = completed("FAILED_FINAL_SENTINEL");
+	result.exitCode = 1;
+	result.stopReason = "error";
+	result.errorMessage = "ERROR_HEAD\n" + "x".repeat(3500) + "DISCARDED_ERROR_SENTINEL" + "x".repeat(3500) + "\nERROR_TAIL_SENTINEL";
+	result.messages.unshift({ role: "assistant", content: [{ type: "toolCall", name: "bash", arguments: { command: "failed-command" } }] });
+	h.runs[0].resolve(result);
+	await flush();
+	initTheme("dark", false);
+	const message = h.sent[0].message;
+	assert.ok(message.details.reason.length <= 6000);
+	assert.match(message.details.reason, /truncated/);
+	assert.doesNotMatch(message.details.reason, /DISCARDED_ERROR_SENTINEL/);
+	const snapshot = JSON.stringify(message);
+	const component = new CustomMessageComponent(message, h.renderers.get("subagent-result"));
+	for (const expanded of [false, true, false]) {
+		component.setExpanded(expanded);
+		const lines = component.render(80);
+		const text = lines.map(stripTerminalSequences).join("\n");
+		assert.match(text, /ERROR_HEAD/);
+		assert.equal(text.includes("ERROR_TAIL_SENTINEL"), expanded);
+		assert.equal(text.includes("truncated"), expanded);
+		assert.equal(text.includes("failed-command"), expanded);
+		assert.doesNotMatch(text, /DISCARDED_ERROR_SENTINEL|FAILED_FINAL_SENTINEL/);
+		assert.ok(lines.every(line => visibleWidth(line) <= 80));
+	}
+	assert.equal(JSON.stringify(message), snapshot);
+});
+
+test("empty final responses stay folded by default and show a placeholder when expanded", async t => {
+	const h = toolHarness(t, { display: { toolCalls: "never" } });
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	h.runs[0].resolve(completed(""));
+	await flush();
+	initTheme("dark", false);
+	const message = h.sent[0].message;
+	assert.match(message.content, /\(no output\)/);
+	const component = new CustomMessageComponent(message, h.renderers.get("subagent-result"));
+	assert.doesNotMatch(component.render(80).map(stripTerminalSequences).join("\n"), /\(no output\)/);
+	component.setExpanded(true);
+	assert.match(component.render(80).map(stripTerminalSequences).join("\n"), /\(no output\)/);
+});
+
+for (const finalPolicy of ["always", "expanded", "never"]) {
+	for (const toolPolicy of ["always", "expanded", "never"]) {
+		for (const injectedToolCalls of ["compact", "none"]) {
+			test(`nested display policy ${finalPolicy}/${toolPolicy}, injected ${injectedToolCalls}`, async t => {
+				const h = toolHarness(t, { injectedToolCalls, display: { finalResponse: finalPolicy, toolCalls: toolPolicy } });
+				await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+				const result = completed("**WORKER_FINAL_SENTINEL**\n\n探索结果：代码已检查。");
+				result.messages.unshift({ role: "assistant", content: [{ type: "toolCall", name: "bash", arguments: { command: "ls src" } }] });
+				h.runs[0].resolve(result);
+				await flush();
+				const message = h.sent[0].message;
+				assert.match(message.content, /WORKER_FINAL_SENTINEL/);
+				assert.doesNotMatch(message.content, /Ctrl\+[oO]/);
+				assert.equal(message.display, true);
+				assert.equal(typeof message.details.headerText, "string");
+				assert.equal(message.details.task, "inspect");
+				assert.deepEqual(message.details.toolCalls, ["$ ls src"]);
+				assert.equal(message.details.toolCallCount, 1);
+				assert.equal("summaryText" in message.details, false);
+				const snapshot = JSON.stringify(message);
+				const renderer = h.renderers.get("subagent-result");
+				for (const name of ["dark", "light"]) {
+					initTheme(name, false);
+					const component = new CustomMessageComponent(message, renderer);
+					for (const expanded of [false, true, false]) {
+						component.setExpanded(expanded);
+						for (const width of [24, 80, 120]) {
+							// Check directly: CustomMessageComponent falls back silently on renderer errors.
+							assert.ok(renderer(message, { expanded, outputPad: 1 }, theme));
+							component.invalidate();
+							const lines = component.render(width);
+							const text = lines.map(stripTerminalSequences).join("\n");
+							assert.equal(text.includes("WORKER_FINAL_SENTINEL"), finalPolicy === "always" || (finalPolicy === "expanded" && expanded));
+							assert.equal(text.includes("$ ls src"), toolPolicy === "always" || (toolPolicy === "expanded" && expanded));
+							assert.doesNotMatch(text, /Ctrl\+O/);
+							if (width >= 80) assert.equal(text.includes("Details collapsed (Ctrl+o to expand)"), !expanded);
+							assert.match(text, /worker #1/);
+							assert.match(text, /Task: inspect/);
+							assert.ok(lines.every(line => visibleWidth(line) <= width));
+						}
+					}
+				}
+				assert.equal(JSON.stringify(message), snapshot);
+				assert.equal(h.sent[0].message.content.includes("$ ls src"), injectedToolCalls === "compact");
+			});
+		}
+	}
+}
 
 test("system prompt asks the model to call subagent instead of asking the user to dispatch", () => {
 	const prompt = readFileSync(new URL("../.pi/agent/APPEND_SYSTEM.md", import.meta.url), "utf8");
