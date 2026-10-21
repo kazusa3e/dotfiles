@@ -1,0 +1,7 @@
+{
+  "maxConcurrent": 8,
+  "model": null,
+  "thinking": null,
+  "statusBar": "lines",
+  "injectedToolCalls": "compact"
+}
