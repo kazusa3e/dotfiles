@@ -23,6 +23,14 @@ set nrformats+=alpha                    " allow <C-a>/<C-x> on letters
 " set exrc                                " allow per-directory .vimrc / .exrc
 " }}}
 
+" auto reload {{{
+augroup SharedChecktime
+  autocmd!
+  autocmd FocusGained,BufEnter * :checktime
+  autocmd CursorHold * :checktime
+augroup END
+" }}}
+
 " indent {{{
 set expandtab                           " use spaces instead of tabs
 set autoindent                          " copy indent from current line
