@@ -1,6 +1,6 @@
 ---
 name: todo
-description: "Track multi-step tasks with a checklist updated at the end of every reply. Load proactively when you judge that a task needs multiple steps, or when the user asks for a todo list or progress tracking."
+description: "Track long-running goals and milestone progress across conversations using available context. Use for work expected to span sessions or when the user requests progress tracking, not merely because a task has multiple steps."
 disable-model-invocation: false
 metadata:
   opencode/autoinvoke: "true"
@@ -8,11 +8,12 @@ metadata:
 
 # Todo
 
-Maintain one checklist for the current task.
+Maintain progress around a long-running goal, not a fresh checklist for each reply.
 
-- Before starting work, list the steps needed to finish, including required checks.
-- Reuse and update the list across replies; revise it when the scope changes.
-- Use these states: ⏳ pending, 🔄 in progress, ✅ completed, 🚧 blocked, ➖ cancelled. Keep at most one step in progress.
-- Mark completion only after verification. State what blocked steps need, and leave unfinished work unresolved when stopping.
-- End every user-facing reply with the full checklist, with nothing after it. Use the user's language and one short line per item.
-- Stop when asked. Do not carry the checklist into unrelated tasks.
+- Track the goal and milestones; distinguish milestone progress from immediate actions. Keep progress in the conversation, without creating tracking files unless asked.
+- When resuming, recover the relevant goal and progress from available history or a handoff before planning new work. If context is missing, ask for a brief recap; never invent prior progress.
+- Use ⏳ pending, 🔄 in progress, ✅ completed, 🚧 blocked, and ➖ cancelled. Keep at most one milestone in progress; mark completion only after verification.
+- Update when milestones, scope, decisions, or blockers change, not after every operation. Completing this turn's actions does not complete the overall goal.
+- Report meaningful changes briefly in the user's language. Show the full checklist only when asked or at a handoff.
+- When pausing or handing off, summarize the goal, verified progress, remaining work, blockers, and next action so another session can continue.
+- Stop tracking when asked. Do not carry progress into unrelated tasks.
