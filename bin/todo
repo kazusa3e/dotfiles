@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -8,12 +9,41 @@ from pathlib import Path
 DEFAULT_DUE_DAYS = 15
 
 
+def select_note(vault):
+    notes = sorted(
+        str(path.relative_to(vault))
+        for path in vault.rglob("*.md")
+        # if not any(
+        #     part.startswith((".", "_")) or part == "Facade"
+        #     for part in path.relative_to(vault).parts
+        # )
+        # and path.name != "AGENTS.md"
+        # and "SFConflict" not in path.name
+        # and "\n" not in str(path)
+    )
+    if not notes:
+        raise ValueError("no notes found")
+    result = subprocess.run(
+        ["fzf", "--no-multi", "--prompt=Note> "],
+        input="\n".join(notes), stdout=subprocess.PIPE, text=True, encoding="utf-8",
+    )
+    if result.returncode in (1, 130):
+        return None
+    selected = result.stdout.rstrip("\n")
+    if result.returncode != 0 or selected not in notes:
+        raise ValueError("fzf failed to select a note")
+    return vault / selected
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
-        print("usage: todo <flash>")
-        print("write into $WIKI_DIR/Inbox.md")
+        print("usage: todo [-e] <flash>")
+        print("append to $WIKI_DIR/Inbox.md; -e selects a note with fzf")
         return 0
 
+    choose_note = argv[0] == "-e"
+    if choose_note or argv[0] == "--":
+        argv = argv[1:]
     text = " ".join(argv).strip()
     if not text:
         print("todo: empty text", file=sys.stderr)
@@ -24,9 +54,9 @@ def main(argv):
         print("todo: WIKI_DIR is not set", file=sys.stderr)
         return 2
 
-    inbox = Path(wiki_dir).expanduser() / "Inbox.md"
-    if not inbox.parent.is_dir():
-        print(f"todo: vault directory not found: {inbox.parent}", file=sys.stderr)
+    vault = Path(wiki_dir).expanduser()
+    if not vault.is_dir():
+        print(f"todo: vault directory not found: {vault}", file=sys.stderr)
         return 2
 
     status = "?" if text.endswith(("?", "？")) else " "
@@ -34,15 +64,24 @@ def main(argv):
     line = f"- [{status}] #task/flash {text} 📅 {due}\n"
 
     try:
-        if not inbox.exists() or inbox.stat().st_size == 0:
-            inbox.write_text("# Inbox\n\n", encoding="utf-8")
-        with inbox.open("a", encoding="utf-8") as f:
-            f.write(line)
-    except OSError as error:
+        target = select_note(vault) if choose_note else vault / "Inbox.md"
+        if target is None:
+            return 130
+        with target.open("r+b" if choose_note else "a+b") as file:
+            file.seek(0, os.SEEK_END)
+            if file.tell() == 0:
+                if not choose_note:
+                    file.write(b"# Inbox\n\n")
+            else:
+                file.seek(-1, os.SEEK_END)
+                if file.read(1) != b"\n":
+                    file.write(b"\n")
+            file.write(line.encode("utf-8"))
+    except (OSError, ValueError) as error:
         print(f"todo: {error}", file=sys.stderr)
         return 1
 
-    print(f"written: {text}, due: {due}")
+    print(f"written: {text}, due: {due}, file: {target}")
     return 0
 
 
