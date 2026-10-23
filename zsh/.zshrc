@@ -24,6 +24,16 @@ export COLORTERM=truecolor
 # vim mode
 bindkey -v
 
+# Nix profiles
+typeset -U path fpath
+plugin_dirs=(/usr/share/zsh/plugins /usr/share)
+for profile in ${=NIX_PROFILES} "$HOME/.nix-profile"; do
+    [[ -d "$profile/bin" ]] && path=("$profile/bin" $path)
+    [[ -d "$profile/share/zsh/site-functions" ]] && fpath=("$profile/share/zsh/site-functions" $fpath)
+    plugin_dirs=("$profile/share" $plugin_dirs)
+done
+unset profile
+
 # completions
 autoload -Uz compinit
 compinit
@@ -31,16 +41,7 @@ compinit
 # starship
 try_eval starship init zsh
 
-if is_linux; then
-    try_source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
-    try_source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-elif is_darwin; then
-    try_source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-    try_source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-fi
-
 # local bin
-typeset -U path
 path=($HOME/.local/bin $path)
 
 # pipenv
@@ -67,7 +68,9 @@ setopt INC_APPEND_HISTORY_TIME          # append history with timestamp
 path=($HOME/.local/share/npm-global/bin $path)
 
 # podman
-export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
+if is_linux && [[ -z ${DOCKER_HOST:-} && -S ${XDG_RUNTIME_DIR:-/run/user/$UID}/podman/podman.sock ]]; then
+    export DOCKER_HOST="unix://${XDG_RUNTIME_DIR:-/run/user/$UID}/podman/podman.sock"
+fi
 
 # <c-g> to edit this command here
 autoload -z edit-command-line
@@ -85,3 +88,10 @@ try_source ~/.zshrc.local
 
 # envrc
 try_eval direnv hook zsh
+
+# Load plugins after widgets and hooks have been configured.
+for share in $plugin_dirs; do
+    (( $+functions[_zsh_autosuggest_start] )) || try_source "$share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    (( $+functions[_zsh_highlight] )) || try_source "$share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+done
+unset share plugin_dirs
