@@ -28,7 +28,6 @@ bindkey -v
 typeset -U path fpath
 plugin_dirs=(/usr/share/zsh/plugins /usr/share)
 for profile in ${=NIX_PROFILES} "$HOME/.nix-profile"; do
-    [[ -d "$profile/bin" ]] && path=("$profile/bin" $path)
     [[ -d "$profile/share/zsh/site-functions" ]] && fpath=("$profile/share/zsh/site-functions" $fpath)
     plugin_dirs=("$profile/share" $plugin_dirs)
 done
