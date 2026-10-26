@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const root = process.env.PI_PACKAGE_ROOT;
 if (!root) throw new Error("Set PI_PACKAGE_ROOT to the installed pi package directory");
@@ -321,7 +323,7 @@ test("running widget renders through the TUI container and clears on completion"
 		sendMessage: (...args) => sent.push(args),
 	};
 	const ctx = {
-		mode: "tui", hasUI: true, cwd: "/tmp", thinkingLevel: "low",
+		mode: "tui", hasUI: true, cwd: "/tmp", thinkingLevel: "low", isIdle: () => true,
 		model: { provider: "test", id: "test" },
 		ui: {
 			theme: { fg: (_token, text) => text },
@@ -383,7 +385,7 @@ function toolHarness(t, config = {}, factory = extension) {
 	const runs = [];
 	const sent = [];
 	const ctx = {
-		mode: "json", hasUI: false, cwd: "/tmp",
+		mode: "json", hasUI: false, cwd: "/tmp", isIdle: () => true,
 		model: { provider: "test-provider", id: "test-model" }, thinkingLevel: "low",
 		ui: { notify() {} },
 	};
@@ -409,6 +411,233 @@ const completed = (text = "Done") => ({
 	messages: [{ role: "assistant", content: [{ type: "text", text }] }],
 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
+
+test("busy subagent results share one boundary continuation and retain separate cards", async t => {
+	const h = toolHarness(t);
+	h.ctx.isIdle = () => false;
+	for (const task of ["inspect A", "inspect B", "inspect C"]) {
+		await h.tools.get("subagent").execute("call", { task }, undefined, undefined, h.ctx);
+	}
+	h.runs[1].resolve(completed("RESULT_B"));
+	h.runs[0].resolve(completed("RESULT_A"));
+	await flush();
+	assert.equal(h.sent.length, 0);
+	const boundary = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
+	assert.equal(boundary.continue, true);
+	assert.deepEqual(boundary.entries.map(entry => entry.details.jobId), [2, 1]);
+	assert.deepEqual(boundary.entries.map(entry => entry.details.task), ["inspect B", "inspect A"]);
+	initTheme("dark", false);
+	for (const entry of boundary.entries) {
+		assert.equal(entry.type, "custom_message");
+		assert.equal(entry.customType, "subagent-result");
+		assert.equal(entry.display, true);
+		assert.ok(h.renderers.get("subagent-result")(entry, { expanded: true, outputPad: 1 }, theme));
+	}
+	assert.equal(h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx), undefined);
+	h.runs[2].resolve(completed("RESULT_C"));
+	await flush();
+	const next = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
+	assert.deepEqual(next.entries.map(entry => entry.details.jobId), [3]);
+	assert.equal(next.continue, true);
+});
+
+test("batching leaves user input, delivery preferences, and the global queue untouched", async t => {
+	const h = toolHarness(t);
+	h.ctx.isIdle = () => false;
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	h.runs[0].resolve(completed());
+	await flush();
+	for (const streamingBehavior of ["steer", "followUp"]) {
+		const event = { text: "user message", source: "interactive", streamingBehavior };
+		assert.deepEqual(h.handlers.get("input")(event, h.ctx), { action: "continue" });
+		assert.deepEqual(event, { text: "user message", source: "interactive", streamingBehavior });
+	}
+	const boundary = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
+	assert.equal(boundary.entries.length, 1);
+	assert.equal(boundary.entries[0].customType, "subagent-result");
+	assert.equal(h.sent.length, 0);
+});
+
+test("result batching preserves other extensions' boundary entries and continuation", async t => {
+	const h = toolHarness(t);
+	h.ctx.isIdle = () => false;
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	h.runs[0].resolve(completed());
+	await flush();
+	const existing = { type: "custom_message", customType: "another-extension", content: "PRESERVED", display: false };
+	const boundary = h.handlers.get("agent_before_settle")({
+		outcome: "error", entries: [existing], continue: true,
+	}, h.ctx);
+	assert.equal(boundary.entries[0], existing);
+	assert.equal(boundary.entries[1].customType, "subagent-result");
+	assert.equal(boundary.continue, true);
+});
+
+test("failed subagents join the same result batch", async t => {
+	const h = toolHarness(t);
+	h.ctx.isIdle = () => false;
+	for (const task of ["success", "failure"]) {
+		await h.tools.get("subagent").execute("call", { task }, undefined, undefined, h.ctx);
+	}
+	h.runs[0].resolve(completed("SUCCESS"));
+	h.runs[1].resolve({ ...completed(), exitCode: 1, stopReason: "error", errorMessage: "FAILURE" });
+	await flush();
+	const boundary = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
+	assert.deepEqual(boundary.entries.map(entry => entry.details.failed), [false, true]);
+	assert.match(boundary.entries[1].content, /FAILURE/);
+	assert.equal(boundary.continue, true);
+});
+
+for (const outcome of ["aborted", "error"]) {
+	test(`result batch does not restart the agent after ${outcome}`, async t => {
+		const h = toolHarness(t);
+		h.ctx.isIdle = () => false;
+		await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+		h.runs[0].resolve(completed());
+		await flush();
+		const boundary = h.handlers.get("agent_before_settle")({ outcome }, h.ctx);
+		assert.equal(boundary.entries.length, 1);
+		assert.equal(boundary.continue, false);
+		assert.equal(h.sent.length, 0);
+	});
+}
+
+test("aborting preserves buffered results without waking the agent", async t => {
+	const h = toolHarness(t);
+	h.ctx.isIdle = () => false;
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	h.runs[0].resolve(completed("BUFFERED_RESULT"));
+	await flush();
+	h.handlers.get("agent_settled")({ aborted: true }, h.ctx);
+	assert.equal(h.sent.length, 1);
+	assert.equal(h.sent[0].options.triggerTurn, false);
+	assert.match(h.sent[0].message.content, /BUFFERED_RESULT/);
+	assert.equal(h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx), undefined);
+});
+
+test("results arriving at settlement trigger only one new run", async t => {
+	const h = toolHarness(t);
+	h.ctx.isIdle = () => false;
+	for (const task of ["first", "second"]) {
+		await h.tools.get("subagent").execute("call", { task }, undefined, undefined, h.ctx);
+	}
+	h.runs[0].resolve(completed("FIRST"));
+	h.runs[1].resolve(completed("SECOND"));
+	await flush();
+	h.handlers.get("agent_settled")({ aborted: false }, h.ctx);
+	assert.equal(h.sent.length, 2);
+	assert.deepEqual(h.sent.map(item => item.options.triggerTurn), [false, true]);
+	h.handlers.get("agent_settled")({ aborted: false }, h.ctx);
+	assert.equal(h.sent.length, 2);
+});
+
+test("session replacement discards buffered results", async t => {
+	const h = toolHarness(t);
+	h.ctx.isIdle = () => false;
+	await h.tools.get("subagent").execute("call", { task: "old session" }, undefined, undefined, h.ctx);
+	h.runs[0].resolve(completed("OLD_SESSION"));
+	await flush();
+	h.handlers.get("session_before_switch")();
+	h.handlers.get("session_start")({}, h.ctx);
+	assert.equal(h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx), undefined);
+	h.handlers.get("agent_settled")({ aborted: false }, h.ctx);
+	assert.equal(h.sent.length, 0);
+});
+
+test("real session consumes user follow-ups separately, then all subagent results together", { timeout: 10000 }, async t => {
+	const {
+		createAgentSession, createEventBus, createExtensionRuntime, ModelRuntime, SessionManager, SettingsManager,
+	} = await import(pathToFileURL(`${root}/dist/index.js`));
+	const { loadExtensionFromFactory } = await import(pathToFileURL(`${root}/dist/core/extensions/loader.js`));
+	const { AssistantMessageEventStream } = await import(pathToFileURL(`${root}/node_modules/@earendil-works/pi-ai/dist/index.js`));
+	const dir = mkdtempSync(join(tmpdir(), "pi-subagent-batch-"));
+	t.after(() => rmSync(dir, { recursive: true, force: true }));
+	t.mock.method(globalThis, "fetch", () => { throw new Error("Network access is forbidden in this test"); });
+	const modelRuntime = await ModelRuntime.create({
+		authPath: join(dir, "auth.json"), modelsPath: null, modelsStorePath: join(dir, "catalog.json"),
+		refreshOnCreate: false, allowModelNetwork: false,
+	});
+	const model = modelRuntime.getModels("openai")[0];
+	assert.ok(model);
+	t.mock.method(modelRuntime, "hasConfiguredAuth", () => true);
+	const runs = [];
+	const runtime = createExtensionRuntime();
+	const loaded = await loadExtensionFromFactory(pi => extension(pi,
+		options => new Promise(resolve => runs.push({ options, resolve })),
+		{ display: { statusBar: "hidden" } },
+	), dir, createEventBus(), runtime);
+	const resourceLoader = {
+		getExtensions: () => ({ extensions: [loaded], errors: [], runtime }),
+		getSkills: () => ({ skills: [], diagnostics: [] }),
+		getPrompts: () => ({ prompts: [], diagnostics: [] }),
+		getThemes: () => ({ themes: [], diagnostics: [] }),
+		getAgentsFiles: () => ({ agentsFiles: [] }),
+		getSystemPrompt: () => "Test assistant",
+		getSystemPromptSource: () => undefined,
+		getAppendSystemPrompt: () => [], getAppendSystemPromptSources: () => [],
+		extendResources() {}, reload: async () => {},
+	};
+	const settingsManager = SettingsManager.inMemory({
+		followUpMode: "one-at-a-time", compaction: { enabled: false }, retry: { enabled: false }, cacheWarming: "off",
+	});
+	const { session } = await createAgentSession({
+		cwd: dir, agentDir: dir, model, modelRuntime, resourceLoader, settingsManager,
+		sessionManager: SessionManager.inMemory(dir), tools: [], thinkingLevel: "off",
+	});
+	t.after(() => session.dispose());
+	const errors = [];
+	await session.bindExtensions({ mode: "print", onError: error => errors.push(error) });
+	const requests = [];
+	let finishInitial;
+	let started;
+	const initialStarted = new Promise(resolve => { started = resolve; });
+	t.mock.method(modelRuntime, "streamSimple", (_model, context) => {
+		requests.push(structuredClone(context.messages));
+		const stream = new AssistantMessageEventStream();
+		const finish = () => {
+			const message = {
+				role: "assistant", api: model.api, provider: model.provider, model: model.id,
+				content: [{ type: "text", text: "ACK" }], stopReason: "stop", timestamp: Date.now(),
+				usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+			};
+			stream.push({ type: "done", reason: "stop", message });
+			stream.end(message);
+		};
+		if (requests.length === 1) {
+			finishInitial = finish;
+			started();
+		} else finish();
+		return stream;
+	});
+	const mainRun = session.prompt("MAIN_TASK");
+	await initialStarted;
+	await session.prompt("/subagent inspect A");
+	await session.prompt("/subagent inspect B");
+	assert.equal(runs.length, 2);
+	await session.followUp("USER_ONE");
+	await session.followUp("USER_TWO");
+	runs[0].resolve(completed("RESULT_A"));
+	runs[1].resolve(completed("RESULT_B"));
+	await flush();
+	finishInitial();
+	await mainRun;
+	assert.deepEqual(errors, []);
+	assert.equal(requests.length, 4);
+	const text = messages => messages.map(message => typeof message.content === "string"
+		? message.content : message.content.filter(part => part.type === "text").map(part => part.text).join("\n")).join("\n");
+	assert.match(text(requests[1]), /USER_ONE/);
+	assert.doesNotMatch(text(requests[1]), /USER_TWO|RESULT_A|RESULT_B/);
+	assert.match(text(requests[2]), /USER_TWO/);
+	assert.doesNotMatch(text(requests[2]), /RESULT_A|RESULT_B/);
+	assert.match(text(requests[3]), /RESULT_A/);
+	assert.match(text(requests[3]), /RESULT_B/);
+	assert.equal(session.agent.followUpMode, "one-at-a-time");
+	assert.equal(settingsManager.getFollowUpMode(), "one-at-a-time");
+	const resultEntries = session.sessionManager.getBranch().filter(entry =>
+		entry.type === "custom_message" && entry.customType === "subagent-result");
+	assert.deepEqual(resultEntries.map(entry => entry.details.jobId), [1, 2]);
+});
 
 for (const injectedToolCalls of ["compact", "none"]) {
 	test(`read results inject without Pi's formatReadLineRange export: ${injectedToolCalls}`, async t => {

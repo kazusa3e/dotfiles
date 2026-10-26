@@ -10,8 +10,9 @@
  *   - While running, each queued/running subagent has one line in a status bar
  *     rendered below the input box; the line disappears when it finishes.
  *   - On completion the result is injected back into the main agent as a custom
- *     message (simplified one-line tool-call view + final output + usage) and
- *     triggers a new turn (queued as followUp when the agent is busy).
+ *     message (simplified one-line tool-call view + final output + usage).
+ *     Results accumulate while the main agent is busy and are consumed together
+ *     before it settles, without changing how user follow-ups are consumed.
  *   - Only the "worker" kind exists; the kind registry leaves room for more.
  *   - No depth limit / no nested spawn: child processes get PI_SUBAGENT_CHILD=1
  *     and never react to `&` or /subagent.
@@ -31,7 +32,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import * as path from "node:path";
 import { Type, type Message } from "@earendil-works/pi-ai";
-import type { ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import type { CustomMessageEntryDraft, ExtensionAPI, ExtensionContext, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Box, Markdown, Text, TruncatedText } from "@earendil-works/pi-tui";
 
@@ -666,6 +667,8 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 	});
 
 	const jobs: Job[] = [];
+	const pendingResults: CustomMessageEntryDraft[] = [];
+	let sessionContext: ExtensionContext | undefined;
 	let nextJobId = 1;
 	let closed = false;
 	let ui: ExtensionUIContext | undefined;
@@ -822,42 +825,66 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 			toolCallMode: config.injectedToolCalls,
 		};
 		const content = buildInjectedContent(summary);
-		try {
-			pi.sendMessage(
-				{
-					customType: "subagent-result",
-					content,
-					display: true,
-					details: {
-						headerText: buildResultHeader(summary),
-						toolCalls: summary.toolCalls.map(call => formatCompactToolCall(call.name, call.args)),
-						toolCallCount: toolCalls.length,
-						finalText: summary.failed ? "" : summary.finalText,
-						jobId: job.id,
-						kind: job.kind,
-						task: job.task,
-						status: failed ? "failed" : "done",
-						failed,
-						reason,
-						exitCode: job.exitCode,
-						stopReason: job.stopReason,
-						model: result.model,
-						turns: job.turns,
-						usage: job.usage,
-					},
-				},
-				{ triggerTurn: true, deliverAs: "followUp" },
-			);
-		} catch (error) {
-			ui?.notify?.(
-				`Subagent ${job.kind} result injection failed: ${error instanceof Error ? error.message : String(error)}`,
-				"warning",
-			);
-		}
+		const message: CustomMessageEntryDraft = {
+			type: "custom_message",
+			customType: "subagent-result",
+			content,
+			display: true,
+			details: {
+				headerText: buildResultHeader(summary),
+				toolCalls: summary.toolCalls.map(call => formatCompactToolCall(call.name, call.args)),
+				toolCallCount: toolCalls.length,
+				finalText: summary.failed ? "" : summary.finalText,
+				jobId: job.id,
+				kind: job.kind,
+				task: job.task,
+				status: failed ? "failed" : "done",
+				failed,
+				reason,
+				exitCode: job.exitCode,
+				stopReason: job.stopReason,
+				model: result.model,
+				turns: job.turns,
+				usage: job.usage,
+			},
+		};
+		pendingResults.push(message);
+		if (sessionContext?.isIdle()) deliverPendingResults(true);
 		if (failed) {
 			ui?.notify?.(`Subagent ${job.kind} failed: ${reason ?? "unknown reason"}`, "error");
 		}
 	}
+
+	function deliverPendingResults(triggerTurn: boolean): void {
+		const messages = pendingResults.splice(0);
+		for (const [index, message] of messages.entries()) {
+			const reportError = (error: unknown) => ui?.notify?.(
+				`Subagent result injection failed: ${error instanceof Error ? error.message : String(error)}`,
+				"warning",
+			);
+			try {
+				void Promise.resolve(pi.sendMessage(message, {
+					triggerTurn: triggerTurn && index === messages.length - 1,
+					deliverAs: "followUp",
+				})).catch(reportError);
+			} catch (error) {
+				reportError(error);
+			}
+		}
+	}
+
+	// Boundary entries share one continuation without entering the user's follow-up queue.
+	pi.on("agent_before_settle", (event) => {
+		if (closed || pendingResults.length === 0) return;
+		return {
+			entries: [...(event.entries ?? []), ...pendingResults.splice(0)],
+			continue: event.continue || event.outcome === "completed",
+		};
+	});
+
+	pi.on("agent_settled", (event) => {
+		if (!closed) deliverPendingResults(!event.aborted);
+	});
 
 	function enqueue(kind: string, task: string, ctx: ExtensionContext): Job | undefined {
 		if (closed || !ctx.cwd) return undefined;
@@ -949,6 +976,8 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 			job.controller?.abort();
 		}
 		jobs.length = 0;
+		pendingResults.length = 0;
+		sessionContext = undefined;
 		stopTimer();
 		clearWidget();
 	};
@@ -958,6 +987,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 	}
 	pi.on("session_start", (_event, ctx) => {
 		closed = false;
+		sessionContext = ctx;
 		ui = ctx.ui;
 		syncWidget();
 	});
