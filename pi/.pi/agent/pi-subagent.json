@@ -1,6 +1,6 @@
 {
   "maxConcurrent": 8,
-  "model": "openai-codex/gpt-6-luna",
+  "model": "openai/gpt-6-luna",
   "thinking": null,
   "injectedToolCalls": "compact",
   "display": {
