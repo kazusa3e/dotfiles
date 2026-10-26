@@ -1,7 +1,47 @@
 #!/usr/bin/env bash
-# Use sysstat's single, consolidated sample rather than polling several /proc
-# files from tmux itself. This file is stowed as ~/.tmux/tmux-status.
+# Use native macOS tools and sysstat on Linux. Stowed as ~/.tmux/tmux-status.
 set -eu
+
+case "$(uname -s)" in
+  Darwin)
+    sample=$(LC_ALL=C top -l 2 -s 1 -n 0 2>/dev/null) || exit 0
+    total_memory=$(sysctl -n hw.memsize 2>/dev/null) || exit 0
+    memory_sample=$(LC_ALL=C vm_stat 2>/dev/null) || exit 0
+    cpu_pct=$(awk '
+      /CPU usage:/ { used = 100 - $(NF - 1); found = 1 }
+      END { if (found) printf "%.0f", used }
+    ' <<<"$sample")
+    # Active, wired and compressed pages exclude reclaimable inactive pages.
+    memory_pct=$(awk -F ': *' -v total="$total_memory" '
+      /page size of/ {
+        page_size = $0
+        sub(/.*page size of /, "", page_size)
+        page_size += 0
+      }
+      $1 == "Pages active" { active = $2 + 0 }
+      $1 == "Pages wired down" { wired = $2 + 0 }
+      $1 == "Pages occupied by compressor" { compressed = $2 + 0 }
+      END {
+        if (page_size > 0 && total > 0)
+          printf "%.0f", (active + wired + compressed) * page_size * 100 / total
+      }
+    ' <<<"$memory_sample")
+    [[ -n "$cpu_pct" && -n "$memory_pct" ]] || exit 0
+    cpu_color='#f9e2af'
+    memory_color='#cba6f7'
+    (( cpu_pct >= 80 )) && cpu_color='#f38ba8'
+    (( memory_pct >= 80 )) && memory_color='#f38ba8'
+    printf '#[fg=%s,bold]󰻠#[nobold]%3s%%#[fg=#6c7086] │ #[fg=%s,bold]󰍛#[nobold]%3s%%' \
+      "$cpu_color" "$cpu_pct" "$memory_color" "$memory_pct"
+    exit 0
+    ;;
+  Linux)
+    for dependency in ip iostat sar; do
+      command -v "$dependency" >/dev/null 2>&1 || exit 0
+    done
+    ;;
+  *) exit 0 ;;
+esac
 
 interface=$(ip route show default | awk 'NR == 1 { print $5 }')
 sample_file=$(mktemp -t tmux-status.XXXXXX)
