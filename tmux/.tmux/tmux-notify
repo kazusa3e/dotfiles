@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pending() {
+  tmux list-panes -a -f '#{@bell_order}' -F \
+    $'#{@bell_order}\t#{pane_id}\t#{session_id}:#{window_id}.#{pane_id}\t#{=/12/…:session_name}:#{window_index}.#{pane_index}' |
+    LC_ALL=C sort -t $'\t' -k1,1n -k2,2 |
+    awk -F '\t' '!seen[$2]++'
+}
+
+refresh() {
+  local _order pane _target label locations count=0 summary=''
+  locations=$(tmux display-message -p '#{E:@bell_locations_format}')
+  while IFS=$'\t' read -r _order pane _target label; do
+    [[ -n "$pane" ]] || continue
+    count=$((count + 1))
+    if (( count <= 3 )); then
+      # Session names are data, never tmux styles or format expressions.
+      label=${label//#/＃}
+      [[ -z "$summary" ]] || summary+=' · '
+      summary+="$label"
+    fi
+  done < <(pending)
+  if (( count > 3 )); then
+    summary+=" (+$((count - 3)))"
+  fi
+  tmux set-option -s @bell_summary "$summary" \; set-option -s @bell_count "$count" \; \
+    set-option -s @bell_locations "$locations"
+  local client
+  while IFS= read -r client; do
+    [[ -z "$client" ]] || tmux refresh-client -S -t "$client" 2>/dev/null || true
+  done < <(tmux list-clients -F '#{client_name}')
+}
+
+case "${1:-}" in
+  init)
+    sessions=$(tmux list-sessions -F '#{session_id}' 2>/dev/null) || exit 0
+    [[ -n "$sessions" ]] || exit 0
+    # Preserve hook-maintained focus on reload, including panes behind popups.
+    while IFS= read -r pane; do
+      [[ -n "$pane" ]] || continue
+      focused=$(tmux show-options -pqv -t "$pane" @bell_focused 2>/dev/null) || continue
+      [[ -z "$focused" ]] || continue
+      tmux set-option -p -t "$pane" @bell_focused 1 \; set-option -pu -t "$pane" @bell_order
+    done < <(tmux list-clients -F '#{?#{m:*focused*,#{client_flags}},#{pane_id},}' | sort -u)
+    refresh
+    ;;
+  refresh) refresh ;;
+  jump)
+    client=${2:?Missing target client}
+    while IFS=$'\t' read -r _order pane target _label; do
+      [[ -n "$pane" ]] || continue
+      if tmux switch-client -c "$client" -t "$target" \; \
+          if-shell -t "$pane" -F '#{window_zoomed_flag}' 'resize-pane -Z'; then
+        exit 0
+      fi
+    done < <(pending)
+    tmux display-message -c "$client" 'No unread pane notifications'
+    ;;
+  *) printf 'Usage: %s {init|refresh|jump CLIENT}\n' "$0" >&2; exit 2 ;;
+esac
