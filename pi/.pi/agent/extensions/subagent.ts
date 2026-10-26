@@ -884,7 +884,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 	pi.registerTool({
 		name: "subagent",
 		label: "Subagent",
-		exposure: "model-only",
+		exposure: "direct",
 		description: "Delegate a self-contained task to a background worker with isolated context. Returns a job ID and running/queued status immediately; the final result arrives automatically as a follow-up message. Provide all necessary context in the task; workers do not inherit the conversation. Workers cannot spawn subagents.",
 		promptGuidelines: [
 			"Prefer the subagent tool for independent, self-contained parts of a decomposable task. Continue other work while workers run; do not poll or spawn duplicate jobs to wait for results.",

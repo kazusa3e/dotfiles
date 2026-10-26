@@ -497,7 +497,7 @@ test("model tool returns a job ID before worker completion, then injects the mat
 	const h = toolHarness(t);
 	const tool = h.tools.get("subagent");
 	assert.ok(tool);
-	assert.equal(tool.exposure, "model-only");
+	assert.equal(tool.exposure, "direct");
 	assert.match(tool.promptGuidelines.join(" "), /independent/);
 	const result = await tool.execute("call", { task: "  inspect src  " }, undefined, undefined, h.ctx);
 	assert.deepEqual(result.details, { jobId: 1, kind: "worker", status: "running" });
@@ -613,7 +613,7 @@ test("Pi's extension loader registers the model tool and its TypeBox schema", as
 	assert.deepEqual(result.errors, []);
 	assert.ok(result.extensions[0].messageRenderers.has("subagent-result"));
 	const tool = result.extensions[0].tools.get("subagent").definition;
-	assert.equal(tool.exposure, "model-only");
+	assert.equal(tool.exposure, "direct");
 	assert.equal(tool.parameters.properties.task.type, "string");
 	assert.deepEqual(tool.parameters.required, ["task"]);
 });
