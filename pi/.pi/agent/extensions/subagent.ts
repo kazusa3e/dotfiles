@@ -450,7 +450,7 @@ export function buildStatusLines(views: StatusJobView[], options: StatusLineOpti
 
 // ── child process runner ────────────────────────────────────────────────────
 
-const RUNNING_FRAMES = ["▘", "▝", "▖", "▗"];
+const RUNNING_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 export interface RunResult {
 	exitCode: number;
@@ -580,7 +580,7 @@ async function runChild(options: {
 // ── extension ───────────────────────────────────────────────────────────────
 
 const WIDGET_KEY = "pi-subagent-status";
-const REFRESH_INTERVAL_MS = 1000;
+const REFRESH_INTERVAL_MS = 80;
 
 interface Job {
 	id: number;
@@ -758,10 +758,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 			model: job.model,
 			thinkingLevel: job.thinkingLevel,
 			signal: job.controller.signal,
-			onMessage: () => {
-				spinnerTick++;
-				syncWidget();
-			},
+			onMessage: () => syncWidget(),
 		})
 			.then((result) => finishJob(job, result))
 			.catch((error) => {

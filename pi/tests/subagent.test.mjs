@@ -40,7 +40,7 @@ const view = (partial) => ({
 	elapsedMs: 12_000,
 	input: 3200,
 	output: 400,
-	spinner: "▘",
+	spinner: "⠋",
 	...partial,
 });
 
@@ -266,11 +266,12 @@ test("buildStatusLines renders one line per job with aligned columns", () => {
 		mode: "lines",
 	});
 	assert.equal(lines.length, 2);
-	assert.ok(lines[0].startsWith("#1 "));
+	assert.ok(lines[0].startsWith("#1 ⠋ worker"));
 	assert.ok(lines[0].includes("explore the codebase"));
 	assert.ok(lines[0].includes("↑3.2k ↓400"));
 	assert.ok(lines[0].includes("12s"));
 	assert.ok(lines[1].includes("write tests"));
+	assert.ok(lines[1].startsWith("#2 · worker"));
 	assert.ok(lines[1].includes("queued"));
 	// Both lines fit the viewport exactly (topic padding absorbs the difference).
 	assert.equal(plainWidth(lines[0]), 80);
@@ -343,11 +344,21 @@ test("running widget renders through the TUI container and clears on completion"
 	const rows = container.render(80);
 	assert.equal(rows.length, 1);
 	assert.match(rows[0], /worker.*inspect files/);
-	assert.match(rows[0], /[▘▝▖▗]/);
-	t.mock.timers.tick(1000);
-	widget.invalidate();
-	const nextRows = container.render(80);
-	assert.notEqual(nextRows[0], rows[0]);
+	assert.match(rows[0], /#1 ⠋ worker/);
+	const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+	for (let tick = 0; tick <= frames.length; tick++) {
+		const expected = `#1 ${frames[tick % frames.length]} worker`;
+		assert.ok(container.render(80)[0].includes(expected));
+		for (let message = 0; message < 20; message++) runs[0].onMessage({ role: "assistant", content: [] });
+		widget.invalidate();
+		assert.ok(container.render(80)[0].includes(expected), "worker output must not advance the spinner");
+		t.mock.timers.tick(79);
+		widget.invalidate();
+		assert.ok(container.render(80)[0].includes(expected), "frames must last the full 80ms");
+		t.mock.timers.tick(1);
+		widget.invalidate();
+		assert.ok(container.render(80)[0].includes(`#1 ${frames[(tick + 1) % frames.length]} worker`));
+	}
 	for (const width of [40, 80, 120]) {
 		assert.doesNotThrow(() => container.render(width));
 	}
