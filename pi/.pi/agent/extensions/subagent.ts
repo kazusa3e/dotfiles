@@ -22,7 +22,8 @@
  * Config: {PI_CODING_AGENT_DIR|~/.pi/agent}/pi-subagent.json
  *   - maxConcurrent (default 8): running cap; extra jobs queue FIFO.
  *   - model / thinking (default null): override the inherited main-agent model
- *     and thinking level for workers.
+ *     and thinking level for workers. "provider/id" is split at the first slash;
+ *     the id keeps any further slashes and is passed separately from the provider.
  *   - injectedToolCalls: "compact" (default) | "none" (model context only)
  *   - display.statusBar: "lines" (default) | "oneline" | "hidden"
  *   - display.toolCalls / display.finalResponse: "always" | "expanded" (default)
@@ -45,7 +46,7 @@ export type ResultVisibility = "always" | "expanded" | "never";
 export interface SubagentConfig {
 	/** Max simultaneously running subagents; the rest queue FIFO. */
 	maxConcurrent: number;
-	/** Override model ("provider/id") for workers; null inherits the main agent. */
+	/** Override model ("provider/id") for workers; the id may contain slashes. Null inherits the main agent. */
 	model: string | null;
 	/** Override thinking level for workers; null inherits the main agent. */
 	thinking: string | null;
@@ -120,6 +121,16 @@ export function normalizeSubagentConfig(input: unknown): SubagentConfig {
 			),
 		},
 	};
+}
+
+/**
+ * Split a configured "provider/id" override at the first slash. The model id may
+ * itself contain slashes, so it must stay separate from the provider argument.
+ */
+export function parseModelSpec(spec: string): { provider?: string; model: string } {
+	const slash = spec.indexOf("/");
+	if (slash <= 0 || slash === spec.length - 1) return { model: spec };
+	return { provider: spec.slice(0, slash), model: spec.slice(slash + 1) };
 }
 
 export const SUBAGENT_CONFIG_PATH = path.join(
@@ -491,6 +502,7 @@ async function runChild(options: {
 	kind: string;
 	task: string;
 	cwd: string;
+	provider?: string;
 	model?: string;
 	thinkingLevel?: string;
 	signal?: AbortSignal;
@@ -498,6 +510,7 @@ async function runChild(options: {
 }): Promise<RunResult> {
 	const kind = SUBAGENT_KINDS[options.kind];
 	const args = ["--mode", "json", "-p", "--no-session"];
+	if (options.provider) args.push("--provider", options.provider);
 	if (options.model) args.push("--model", options.model);
 	if (options.thinkingLevel) args.push("--thinking", options.thinkingLevel);
 	if (kind) args.push("--append-system-prompt", kind.systemPrompt);
@@ -597,6 +610,7 @@ interface Job {
 	kind: string;
 	task: string;
 	cwd: string;
+	provider?: string;
 	model?: string;
 	thinkingLevel?: string;
 	status: "queued" | "running" | "resultPending";
@@ -767,6 +781,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 			kind: job.kind,
 			task: job.task,
 			cwd: job.cwd,
+			provider: job.provider,
 			model: job.model,
 			thinkingLevel: job.thinkingLevel,
 			signal: job.controller.signal,
@@ -912,14 +927,16 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 
 	function enqueue(kind: string, task: string, ctx: ExtensionContext): Job | undefined {
 		if (closed || !ctx.cwd) return undefined;
+		const override = config.model ? parseModelSpec(config.model) : undefined;
 		const job: Job = {
 			id: nextJobId++,
 			kind,
 			task,
 			cwd: ctx.cwd,
-			model:
-				config.model ??
-				(ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined),
+			// Keep provider and id separate: an id such as "z-ai/glm-5.3" would be
+			// ambiguous when joined into one "provider/id" string.
+			provider: override ? override.provider : ctx.model?.provider,
+			model: override ? override.model : ctx.model?.id,
 			thinkingLevel: config.thinking ?? ctx.thinkingLevel,
 			status: "queued",
 			createdAt: Date.now(),

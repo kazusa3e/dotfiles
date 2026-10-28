@@ -30,6 +30,7 @@ const {
 	formatTokens,
 	normalizeSubagentConfig,
 	parseKindPrefix,
+	parseModelSpec,
 	plainWidth,
 	splitTrailingAmpersand,
 	truncatePlain,
@@ -131,6 +132,15 @@ test("normalizeSubagentConfig validates nested modes and legacy aliases", () => 
 	}).display, { statusBar: "lines", toolCalls: "expanded", finalResponse: "expanded" });
 	assert.deepEqual(normalizeSubagentConfig({ statusBar: "hidden", finalResponse: "show", display: { statusBar: "lines", finalResponse: "never" } }).display,
 		{ statusBar: "lines", toolCalls: "expanded", finalResponse: "never" });
+});
+
+test("parseModelSpec splits provider at the first slash and keeps slashed ids intact", () => {
+	assert.deepEqual(parseModelSpec("openai/gpt-6-luna"), { provider: "openai", model: "gpt-6-luna" });
+	assert.deepEqual(parseModelSpec("openrouter/z-ai/glm-5.3"), { provider: "openrouter", model: "z-ai/glm-5.3" });
+	// A bare id keeps fuzzy provider selection instead of inventing a provider.
+	assert.deepEqual(parseModelSpec("sonnet"), { model: "sonnet" });
+	assert.deepEqual(parseModelSpec("/leading"), { model: "/leading" });
+	assert.deepEqual(parseModelSpec("trailing/"), { model: "trailing/" });
 });
 
 test("formatTokens renders compact k/M units", () => {
@@ -774,7 +784,8 @@ test("model tool returns a job ID before worker completion, then injects the mat
 	assert.equal(h.runs.length, 1);
 	assert.equal(h.sent.length, 0);
 	assert.equal(h.runs[0].options.task, "inspect src");
-	assert.equal(h.runs[0].options.model, "test-provider/test-model");
+	assert.equal(h.runs[0].options.provider, "test-provider");
+	assert.equal(h.runs[0].options.model, "test-model");
 	assert.equal(h.runs[0].options.thinkingLevel, "low");
 	h.runs[0].resolve(completed("Inspected src"));
 	await flush();
@@ -783,6 +794,26 @@ test("model tool returns a job ID before worker completion, then injects the mat
 	assert.match(h.sent[0].message.content, /worker #1.*done/);
 	assert.match(h.sent[0].message.content, /Inspected src/);
 	assert.deepEqual(h.sent[0].options, { triggerTurn: true, deliverAs: "followUp" });
+});
+
+test("inherited model ids with slashes keep provider and model separate", async t => {
+	const h = toolHarness(t);
+	h.ctx.model = { provider: "openrouter", id: "z-ai/glm-5.3" };
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	assert.equal(h.runs[0].options.provider, "openrouter");
+	assert.equal(h.runs[0].options.model, "z-ai/glm-5.3");
+});
+
+test("configured overrides split provider from a slashed model id", async t => {
+	const h = toolHarness(t, { model: "openrouter/z-ai/glm-5.3" });
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	assert.equal(h.runs[0].options.provider, "openrouter");
+	assert.equal(h.runs[0].options.model, "z-ai/glm-5.3");
+
+	const bare = toolHarness(t, { model: "sonnet" });
+	await bare.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, bare.ctx);
+	assert.equal(bare.runs[0].options.provider, undefined);
+	assert.equal(bare.runs[0].options.model, "sonnet");
 });
 
 test("model, command and ampersand dispatch share the concurrency cap and FIFO queue", async t => {
