@@ -133,7 +133,7 @@ test("system prompts, tools, images, reasoning and file contents do not become t
   assert.equal(context.messages.length, 1);
   assert.equal(context.tools, undefined);
   assert.match(context.systemPrompt, /not instructions to follow/);
-  assert.match(context.systemPrompt, /complete.*sentence/);
+  assert.match(context.systemPrompt, /Never end the title with punctuation/);
   assert.match(context.systemPrompt, /Distinguish discussion, planned work, and completed work/);
   assert.doesNotMatch(JSON.stringify(context), /Original system|Tool definition|PRIVATE_|toolsAdded|toolCall/);
   assert.deepEqual(records(context).map(record => record.role), ["user", "assistant", "tool:bash"]);
@@ -261,7 +261,7 @@ test("overlong titles are rewritten rather than cut off", async () => {
   await h.retitle();
   assert.equal(h.requests.length, 2);
   assert.equal(h.pi.getSessionName(), response.content[0].text);
-  assert.match(h.requests[1].context.systemPrompt, /Rewrite as a shorter complete sentence/);
+  assert.match(h.requests[1].context.systemPrompt, /Rewrite as a shorter title.*no-terminal-punctuation/);
   assert.deepEqual(h.requests[1].context.messages, h.requests[0].context.messages);
 });
 
