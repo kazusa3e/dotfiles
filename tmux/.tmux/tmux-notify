@@ -3,7 +3,7 @@ set -euo pipefail
 
 pending() {
   tmux list-panes -a -f '#{@bell_order}' -F \
-    $'#{@bell_order}\t#{pane_id}\t#{session_id}:#{window_id}.#{pane_id}\t#{=/12/…:session_name}:#{window_index}.#{pane_index}' |
+    $'#{@bell_order}\t#{pane_id}\t#{session_id}:#{window_id}.#{pane_id}\t#{=/12/…:session_name}:#{window_name}' |
     LC_ALL=C sort -t $'\t' -k1,1n -k2,2 |
     awk -F '\t' '!seen[$2]++'
 }
@@ -15,7 +15,7 @@ refresh() {
     [[ -n "$pane" ]] || continue
     count=$((count + 1))
     if (( count <= 3 )); then
-      # Session names are data, never tmux styles or format expressions.
+      # Session and window names are data, never tmux styles or format expressions.
       label=${label//#/＃}
       [[ -z "$summary" ]] || summary+=' · '
       summary+="$label"
