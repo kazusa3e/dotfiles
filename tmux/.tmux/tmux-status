@@ -2,6 +2,21 @@
 # Use native macOS tools and sysstat on Linux. Stowed as ~/.tmux/tmux-status.
 set -eu
 
+rate() {
+  awk -v kib="$1" 'BEGIN {
+    bytes = kib * 1024
+    mib = bytes / 1048576
+    gib = bytes / 1073741824
+    if (bytes < 1024) value = sprintf("%.0fB/s", bytes)
+    else if (bytes < 1048576) value = sprintf("%dKB/s", int(bytes / 1024))
+    else if (mib < 100) value = sprintf("%.1fMB/s", mib)
+    else if (mib < 1024) value = sprintf("%dMB/s", int(mib))
+    else if (gib < 100) value = sprintf("%.1fGB/s", gib)
+    else value = sprintf("%dGB/s", int(gib))
+    printf "%7s", value
+  }'
+}
+
 case "$(uname -s)" in
   Darwin)
     sample=$(LC_ALL=C top -l 2 -s 1 -n 0 2>/dev/null) || exit 0
@@ -27,12 +42,70 @@ case "$(uname -s)" in
       }
     ' <<<"$memory_sample")
     [[ -n "$cpu_pct" && -n "$memory_pct" ]] || exit 0
+
+    interface=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
+    network_counters() {
+      netstat -ib 2>/dev/null | awk -v interface="$interface" '
+        $1 == interface { rx += $7; tx += $10 }
+        END { printf "%.0f %.0f\n", rx + 0, tx + 0 }
+      '
+    }
+    disk_counters() {
+      local kind value decimal
+      local disk_read_bytes=0
+      local disk_written_bytes=0
+      while read -r kind value; do
+        value=${value%,}
+        decimal=$(printf '%d' "$value" 2>/dev/null) || decimal=0
+        if [[ "$kind" == read ]]; then
+          disk_read_bytes=$((disk_read_bytes + decimal))
+        else
+          disk_written_bytes=$((disk_written_bytes + decimal))
+        fi
+      done < <(ioreg -r -c IOBlockStorageDriver -w 0 2>/dev/null | awk '
+        /"Bytes \(Read\)"[[:space:]]*=/ { print "read", $NF }
+        /"Bytes \(Write\)"[[:space:]]*=/ { print "write", $NF }
+      ')
+      printf '%s %s\n' "$disk_read_bytes" "$disk_written_bytes"
+    }
+
+    read -r net_before_in net_before_out <<<"$(network_counters)"
+    read -r disk_before_read disk_before_written <<<"$(disk_counters)"
+    sleep 1
+    read -r net_after_in net_after_out <<<"$(network_counters)"
+    read -r disk_after_read disk_after_written <<<"$(disk_counters)"
+    net_read=$(awk -v before="$net_before_in" -v after="$net_after_in" '
+      BEGIN { delta = after - before; if (delta < 0) delta = 0; printf "%.3f", delta / 1024 }
+    ')
+    net_written=$(awk -v before="$net_before_out" -v after="$net_after_out" '
+      BEGIN { delta = after - before; if (delta < 0) delta = 0; printf "%.3f", delta / 1024 }
+    ')
+    disk_read=$(awk -v before="$disk_before_read" -v after="$disk_after_read" '
+      BEGIN { delta = after - before; if (delta < 0) delta = 0; printf "%.3f", delta / 1024 }
+    ')
+    disk_written=$(awk -v before="$disk_before_written" -v after="$disk_after_written" '
+      BEGIN { delta = after - before; if (delta < 0) delta = 0; printf "%.3f", delta / 1024 }
+    ')
+
     cpu_color='#f9e2af'
     memory_color='#cba6f7'
+    network_color='#89dceb'
+    disk_color='#fab387'
+    (( $(awk -v read="$net_read" -v written="$net_written" 'BEGIN { print (read >= 1024 || written >= 1024) ? 1 : 0 }') )) && network_color='#f38ba8'
+    (( $(awk -v read="$disk_read" -v written="$disk_written" 'BEGIN { print (read >= 1024 || written >= 1024) ? 1 : 0 }') )) && disk_color='#f38ba8'
     (( cpu_pct >= 80 )) && cpu_color='#f38ba8'
     (( memory_pct >= 80 )) && memory_color='#f38ba8'
-    printf '#[fg=%s,bold]󰻠#[nobold]%3s%%#[fg=#6c7086] │ #[fg=%s,bold]󰍛#[nobold]%3s%%' \
-      "$cpu_color" "$cpu_pct" "$memory_color" "$memory_pct"
+    printf '#[fg=%s,bold]󰈀#[nobold] %s↓ %s↑#[fg=#6c7086] │ #[fg=%s,bold]󰻠#[nobold]%4s#[fg=#6c7086] │ #[fg=%s,bold]󰋊#[nobold] R%s W%s#[fg=#6c7086] │ #[fg=%s,bold]󰍛#[nobold]%4s' \
+      "$network_color" \
+      "$(rate "$net_read")" \
+      "$(rate "$net_written")" \
+      "$cpu_color" \
+      "$(printf '%3s%%' "$cpu_pct")" \
+      "$disk_color" \
+      "$(rate "$disk_read")" \
+      "$(rate "$disk_written")" \
+      "$memory_color" \
+      "$(printf '%3s%%' "$memory_pct")"
     exit 0
     ;;
   Linux)
@@ -55,21 +128,6 @@ sar_pid=$!
 wait "$iostat_pid"
 wait "$sar_pid"
 sample=$(<"$sample_file")
-
-rate() {
-  awk -v kib="$1" 'BEGIN {
-    bytes = kib * 1024
-    mib = bytes / 1048576
-    gib = bytes / 1073741824
-    if (bytes < 1024) value = sprintf("%.0fB/s", bytes)
-    else if (bytes < 1048576) value = sprintf("%dKB/s", int(bytes / 1024))
-    else if (mib < 100) value = sprintf("%.1fMB/s", mib)
-    else if (mib < 1024) value = sprintf("%dMB/s", int(mib))
-    else if (gib < 100) value = sprintf("%.1fGB/s", gib)
-    else value = sprintf("%dGB/s", int(gib))
-    printf "%7s", value
-  }'
-}
 
 disk_sparklines() {
   awk '
