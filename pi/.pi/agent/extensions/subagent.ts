@@ -8,11 +8,13 @@
  *   - The subagent tool, a user prompt ending with `&`, or /subagent spawns a
  *     worker in the background without blocking the main session.
  *   - While running, each queued/running subagent has one line in a status bar
- *     rendered below the input box; the line disappears when it finishes.
- *   - On completion the result is injected back into the main agent as a custom
- *     message (simplified one-line tool-call view + final output + usage).
- *     Results accumulate while the main agent is busy and are consumed together
- *     before it settles, without changing how user follow-ups are consumed.
+ *     rendered below the input box. A finished job stays as "result queued"
+ *     until message_end confirms its custom message entered the session tree.
+ *   - On completion the result is sent back as a custom message (simplified
+ *     one-line tool-call view + final output + usage). When the main agent is
+ *     idle this starts a followUp turn; while busy it queues as a pending custom
+ *     message and lands at the next turn boundary instead of waiting for settle.
+ *     A 60s TTL retires jobs whose confirmation never arrives.
  *   - Only the "worker" kind exists; the kind registry leaves room for more.
  *   - No depth limit / no nested spawn: child processes get PI_SUBAGENT_CHILD=1
  *     and never react to `&` or /subagent.
@@ -392,7 +394,7 @@ export type StatusStyler = (role: StatusRole, text: string) => string;
 export interface StatusJobView {
 	kind: string;
 	topic: string;
-	status: "queued" | "running";
+	status: "queued" | "running" | "resultPending";
 	elapsedMs: number;
 	input: number;
 	output: number;
@@ -418,8 +420,10 @@ export function buildStatusLines(views: StatusJobView[], options: StatusLineOpti
 		);
 		const line = views
 			.map((view) => {
-				const role = view.status === "queued" ? "queued" : "spinner";
-				return `${style(role, view.spinner)} ${style("topic", truncatePlain(view.topic, budget))}`;
+				const role = view.status === "running" ? "spinner" : "queued";
+				const suffix = view.status === "resultPending" && budget > 19 ? " (result queued)" : "";
+				const topicBudget = Math.max(2, budget - plainWidth(suffix) - 2);
+				return `${style(role, view.spinner)} ${style("topic", truncatePlain(view.topic, topicBudget))}${style("queued", suffix)}`;
 			})
 			.join(separator);
 		return [line];
@@ -432,16 +436,20 @@ export function buildStatusLines(views: StatusJobView[], options: StatusLineOpti
 		if (view.input || view.output) {
 			rightParts.push(`↑${formatTokens(view.input)} ↓${formatTokens(view.output)}`);
 		}
-		rightParts.push(view.status === "queued" ? "queued" : formatElapsed(view.elapsedMs));
+		rightParts.push(
+			view.status === "queued" ? "queued" :
+				view.status === "resultPending" ? "result queued" :
+					formatElapsed(view.elapsedMs),
+		);
 		const plainRight = rightParts.join(" · ");
 		const topicBudget = Math.max(4, options.width - plainWidth(plainLeft) - plainWidth(plainRight) - 4);
 		const topic = truncatePlain(view.topic, topicBudget);
 		const padded = topic + " ".repeat(topicBudget - plainWidth(topic));
 
-		const spinnerRole = view.status === "queued" ? "queued" : "spinner";
+		const spinnerRole = view.status === "running" ? "spinner" : "queued";
 		const head = `${style("index", `#${index + 1}`)} ${style(spinnerRole, view.spinner)} ${style("kind", view.kind)}`;
 		const right = rightParts.map((part, i) => {
-			const role = i === 0 ? "tokens" : view.status === "queued" ? "queued" : "time";
+			const role = i === 0 ? "tokens" : view.status === "running" ? "time" : "queued";
 			return style(role, part);
 		});
 		lines.push(`${head}  ${style("topic", padded)}  ${right.join(" · ")}`);
@@ -582,6 +590,7 @@ async function runChild(options: {
 
 const WIDGET_KEY = "pi-subagent-status";
 const REFRESH_INTERVAL_MS = 80;
+export const RESULT_TTL_MS = 60_000;
 
 interface Job {
 	id: number;
@@ -590,9 +599,10 @@ interface Job {
 	cwd: string;
 	model?: string;
 	thinkingLevel?: string;
-	status: "queued" | "running";
+	status: "queued" | "running" | "resultPending";
 	createdAt: number;
 	runStartedAt?: number;
+	resultTimer?: ReturnType<typeof setTimeout>;
 	usage: UsageStats;
 	turns: number;
 	messages: Message[];
@@ -667,7 +677,6 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 	});
 
 	const jobs: Job[] = [];
-	const pendingResults: CustomMessageEntryDraft[] = [];
 	let sessionContext: ExtensionContext | undefined;
 	let nextJobId = 1;
 	let closed = false;
@@ -705,7 +714,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 				widgetTui = tui;
 				return {
 					render: (width: number) => {
-						const views = activeJobs();
+						const views = jobs;
 						if (views.length === 0) return [];
 						const style: StatusStyler = makeStyler(ui?.theme);
 						return buildStatusLines(
@@ -721,7 +730,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 	};
 
 	const syncWidget = () => {
-		if (!ui || config.display.statusBar === "hidden" || activeJobs().length === 0) {
+		if (!ui || config.display.statusBar === "hidden" || jobs.length === 0) {
 			clearWidget();
 			return;
 		}
@@ -786,18 +795,37 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 		job.stopReason = result.stopReason;
 		job.errorMessage = result.errorMessage;
 		job.exitCode = result.exitCode;
-		const index = jobs.indexOf(job);
-		if (index !== -1) jobs.splice(index, 1);
 		if (!job.aborted && !result.aborted && !closed) {
+			job.status = "resultPending";
+			scheduleResultExpiry(job);
 			injectResult(job, result);
+		} else {
+			retireJob(job);
 		}
 		syncWidget();
-		if (activeJobs().length === 0) {
-			stopTimer();
-			clearWidget();
-		} else {
-			dequeue();
+		if (activeJobs().length === 0) stopTimer();
+		dequeue();
+	}
+
+	function scheduleResultExpiry(job: Job): void {
+		const timer = setTimeout(() => {
+			job.resultTimer = undefined;
+			if (job.status === "resultPending") retireJob(job);
+		}, RESULT_TTL_MS);
+		timer.unref?.();
+		job.resultTimer = timer;
+	}
+
+	function retireJob(job: Job): void {
+		if (job.resultTimer !== undefined) {
+			clearTimeout(job.resultTimer);
+			job.resultTimer = undefined;
 		}
+		const index = jobs.indexOf(job);
+		if (index !== -1) jobs.splice(index, 1);
+		syncWidget();
+		if (activeJobs().length === 0) stopTimer();
+		if (jobs.length === 0) clearWidget();
 	}
 
 	function injectResult(job: Job, result: RunResult): void {
@@ -848,42 +876,38 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 				usage: job.usage,
 			},
 		};
-		pendingResults.push(message);
-		if (sessionContext?.isIdle()) deliverPendingResults(true);
+		deliverResult(message);
 		if (failed) {
 			ui?.notify?.(`Subagent ${job.kind} failed: ${reason ?? "unknown reason"}`, "error");
 		}
 	}
 
-	function deliverPendingResults(triggerTurn: boolean): void {
-		const messages = pendingResults.splice(0);
-		for (const [index, message] of messages.entries()) {
-			const reportError = (error: unknown) => ui?.notify?.(
-				`Subagent result injection failed: ${error instanceof Error ? error.message : String(error)}`,
-				"warning",
-			);
-			try {
-				void Promise.resolve(pi.sendMessage(message, {
-					triggerTurn: triggerTurn && index === messages.length - 1,
-					deliverAs: "followUp",
-				})).catch(reportError);
-			} catch (error) {
-				reportError(error);
-			}
+	function deliverResult(message: CustomMessageEntryDraft): void {
+		const reportError = (error: unknown) => ui?.notify?.(
+			`Subagent result injection failed: ${error instanceof Error ? error.message : String(error)}`,
+			"warning",
+		);
+		// While busy, triggerTurn:false routes a custom message into Pi's pending-custom
+		// queue, which is flushed at the next turn boundary. A true value would put it in
+		// the steering queue, which abort clears without restoring custom messages.
+		const options = sessionContext?.isIdle()
+			? { deliverAs: "followUp" as const, triggerTurn: true }
+			: { deliverAs: "steer" as const, triggerTurn: false };
+		try {
+			void Promise.resolve(pi.sendMessage(message, options)).catch(reportError);
+		} catch (error) {
+			reportError(error);
 		}
 	}
 
-	// Boundary entries share one continuation without entering the user's follow-up queue.
-	pi.on("agent_before_settle", (event) => {
-		if (closed || pendingResults.length === 0) return;
-		return {
-			entries: [...(event.entries ?? []), ...pendingResults.splice(0)],
-			continue: event.continue || event.outcome === "completed",
-		};
-	});
-
-	pi.on("agent_settled", (event) => {
-		if (!closed) deliverPendingResults(!event.aborted);
+	// Retire the job only once Pi has persisted the result custom message.
+	pi.on("message_end", (event) => {
+		const message = event.message;
+		if (message.role !== "custom" || message.customType !== "subagent-result") return;
+		const jobId = (message.details as { jobId?: unknown } | undefined)?.jobId;
+		if (typeof jobId !== "number") return;
+		const job = jobs.find((candidate) => candidate.id === jobId && candidate.status === "resultPending");
+		if (job) retireJob(job);
 	});
 
 	function enqueue(kind: string, task: string, ctx: ExtensionContext): Job | undefined {
@@ -912,7 +936,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 		name: "subagent",
 		label: "Subagent",
 		exposure: "direct",
-		description: "Delegate a self-contained task to a background worker with isolated context. Returns a job ID and running/queued status immediately; the final result arrives automatically as a follow-up message. Provide all necessary context in the task; workers do not inherit the conversation. Workers cannot spawn subagents.",
+		description: "Delegate a self-contained task to a background worker with isolated context. Returns a job ID and running/queued status immediately; the final result arrives automatically as a custom result message. Provide all necessary context in the task; workers do not inherit the conversation. Workers cannot spawn subagents.",
 		promptGuidelines: [
 			"Prefer the subagent tool for independent, self-contained parts of a decomposable task. Continue other work while workers run; do not poll or spawn duplicate jobs to wait for results.",
 		],
@@ -929,7 +953,7 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 			const job = enqueue(kind, task, ctx);
 			if (!job) throw new Error("Cannot spawn subagent in the current session");
 			return {
-				content: [{ type: "text", text: `Subagent #${job.id} (${job.kind}) ${job.status} in background. The final result will arrive automatically as a follow-up; continue other work.` }],
+				content: [{ type: "text", text: `Subagent #${job.id} (${job.kind}) ${job.status} in background. The final result will arrive automatically as a custom result message; continue other work.` }],
 				details: { jobId: job.id, kind: job.kind, status: job.status },
 			};
 		},
@@ -974,9 +998,9 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 		for (const job of jobs) {
 			job.aborted = true;
 			job.controller?.abort();
+			if (job.resultTimer !== undefined) clearTimeout(job.resultTimer);
 		}
 		jobs.length = 0;
-		pendingResults.length = 0;
 		sessionContext = undefined;
 		stopTimer();
 		clearWidget();

@@ -22,7 +22,7 @@ A Nix daemon is available in the environment. Prefer the project's existing Nix 
 
 When a task can be decomposed into independent parts, prefer calling the `subagent` tool for self-contained work (e.g. exploration, audits, isolated refactors) instead of doing everything inline. Delegate only when the expected benefit outweighs coordination overhead. Include the necessary context and constraints: workers do not inherit the conversation. Keep concurrent work independent and avoid overlapping file edits. Review worker results and verify consequential claims before relying on them; delegation does not transfer responsibility for the final outcome.
 
-The tool returns a job ID and running/queued status immediately. Continue other work; the final result is injected automatically as a follow-up. Do not poll or dispatch duplicate jobs while waiting. If the tool is unavailable, work inline.
+The tool returns a job ID and running/queued status immediately. Continue other work; the final result is injected automatically as a custom message, starting a turn when idle or landing at the next turn boundary while busy. Do not poll or dispatch duplicate jobs while waiting. If the tool is unavailable, work inline.
 
 # Implementation workflow
 

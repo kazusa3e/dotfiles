@@ -302,6 +302,16 @@ test("buildStatusLines returns no lines for empty jobs or narrow terminals", () 
 	assert.deepEqual(buildStatusLines([view({})], { width: 10, mode: "lines" }), []);
 });
 
+test("buildStatusLines marks resultPending jobs as result queued", () => {
+	const pending = view({ status: "resultPending", spinner: "·" });
+	for (const mode of ["lines", "oneline"]) {
+		const lines = buildStatusLines([pending], { width: 80, mode });
+		assert.equal(lines.length, 1);
+		assert.match(lines[0], /result queued/);
+		assert.ok(!lines[0].includes("queued ·"), "queued state must not be mislabeled");
+	}
+});
+
 test("running widget renders through the TUI container and clears on completion", async (t) => {
 	t.mock.timers.enable({ apis: ["setInterval"] });
 	let finish;
@@ -372,9 +382,18 @@ test("running widget renders through the TUI container and clears on completion"
 		stopReason: "stop",
 	});
 	await new Promise(resolve => setImmediate(resolve));
-	assert.equal(widget, undefined);
+	assert.ok(widget, "result stays visible while awaiting message_end");
+	assert.match(container.render(80)[0], /result queued/);
 	assert.equal(sent.length, 1);
 	assert.deepEqual(sent[0][1], { triggerTurn: true, deliverAs: "followUp" });
+	handlers.get("message_end")({
+		type: "message_end",
+		message: {
+			role: "custom", customType: "subagent-result", content: "", display: true,
+			details: { jobId: sent[0][0].details.jobId },
+		},
+	}, ctx);
+	assert.equal(widget, undefined);
 });
 
 function toolHarness(t, config = {}, factory = extension) {
@@ -412,7 +431,40 @@ const completed = (text = "Done") => ({
 });
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
-test("busy subagent results share one boundary continuation and retain separate cards", async t => {
+function widgetHarness(t) {
+	const handlers = new Map();
+	const commands = new Map();
+	const tools = new Map();
+	const runs = [];
+	const sent = [];
+	let widget;
+	const ctx = {
+		mode: "tui", hasUI: true, cwd: "/tmp", thinkingLevel: "low", isIdle: () => true,
+		model: { provider: "test", id: "test" },
+		ui: {
+			theme: { fg: (_token, text) => text },
+			notify() {},
+			setWidget: (_key, factory) => {
+				widget = factory?.({ requestRender() {} });
+			},
+		},
+	};
+	const pi = {
+		on: (name, handler) => handlers.set(name, handler),
+		registerCommand: (name, command) => commands.set(name, command),
+		registerTool: tool => tools.set(tool.name, tool),
+		registerMessageRenderer: () => {},
+		sendMessage: (message, options) => sent.push({ message, options }),
+	};
+	extension(pi, options => new Promise((resolve, reject) => runs.push({ options, resolve, reject })), {
+		...DEFAULT_SUBAGENT_CONFIG,
+	});
+	handlers.get("session_start")({}, ctx);
+	t.after(() => handlers.get("session_shutdown")());
+	return { handlers, commands, tools, runs, sent, ctx, render: (width = 80) => widget?.render(width) ?? [] };
+}
+
+test("busy subagent results are delivered immediately as pending custom messages", async t => {
 	const h = toolHarness(t);
 	h.ctx.isIdle = () => false;
 	for (const task of ["inspect A", "inspect B", "inspect C"]) {
@@ -421,27 +473,21 @@ test("busy subagent results share one boundary continuation and retain separate 
 	h.runs[1].resolve(completed("RESULT_B"));
 	h.runs[0].resolve(completed("RESULT_A"));
 	await flush();
-	assert.equal(h.sent.length, 0);
-	const boundary = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
-	assert.equal(boundary.continue, true);
-	assert.deepEqual(boundary.entries.map(entry => entry.details.jobId), [2, 1]);
-	assert.deepEqual(boundary.entries.map(entry => entry.details.task), ["inspect B", "inspect A"]);
-	initTheme("dark", false);
-	for (const entry of boundary.entries) {
-		assert.equal(entry.type, "custom_message");
-		assert.equal(entry.customType, "subagent-result");
-		assert.equal(entry.display, true);
-		assert.ok(h.renderers.get("subagent-result")(entry, { expanded: true, outputPad: 1 }, theme));
-	}
-	assert.equal(h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx), undefined);
+	assert.equal(h.sent.length, 2);
+	assert.deepEqual(h.sent.map(item => item.options), [
+		{ deliverAs: "steer", triggerTurn: false },
+		{ deliverAs: "steer", triggerTurn: false },
+	]);
+	assert.deepEqual(h.sent.map(item => item.message.details.jobId), [2, 1]);
+	assert.match(h.sent[0].message.content, /RESULT_B/);
+	assert.match(h.sent[1].message.content, /RESULT_A/);
 	h.runs[2].resolve(completed("RESULT_C"));
 	await flush();
-	const next = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
-	assert.deepEqual(next.entries.map(entry => entry.details.jobId), [3]);
-	assert.equal(next.continue, true);
+	assert.equal(h.sent.length, 3);
+	assert.equal(h.sent[2].message.details.jobId, 3);
 });
 
-test("batching leaves user input, delivery preferences, and the global queue untouched", async t => {
+test("pending-custom delivery leaves user input and delivery preferences untouched", async t => {
 	const h = toolHarness(t);
 	h.ctx.isIdle = () => false;
 	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
@@ -452,28 +498,11 @@ test("batching leaves user input, delivery preferences, and the global queue unt
 		assert.deepEqual(h.handlers.get("input")(event, h.ctx), { action: "continue" });
 		assert.deepEqual(event, { text: "user message", source: "interactive", streamingBehavior });
 	}
-	const boundary = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
-	assert.equal(boundary.entries.length, 1);
-	assert.equal(boundary.entries[0].customType, "subagent-result");
-	assert.equal(h.sent.length, 0);
+	assert.equal(h.sent.length, 1);
+	assert.deepEqual(h.sent[0].options, { deliverAs: "steer", triggerTurn: false });
 });
 
-test("result batching preserves other extensions' boundary entries and continuation", async t => {
-	const h = toolHarness(t);
-	h.ctx.isIdle = () => false;
-	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
-	h.runs[0].resolve(completed());
-	await flush();
-	const existing = { type: "custom_message", customType: "another-extension", content: "PRESERVED", display: false };
-	const boundary = h.handlers.get("agent_before_settle")({
-		outcome: "error", entries: [existing], continue: true,
-	}, h.ctx);
-	assert.equal(boundary.entries[0], existing);
-	assert.equal(boundary.entries[1].customType, "subagent-result");
-	assert.equal(boundary.continue, true);
-});
-
-test("failed subagents join the same result batch", async t => {
+test("failed subagents are delivered immediately while busy", async t => {
 	const h = toolHarness(t);
 	h.ctx.isIdle = () => false;
 	for (const task of ["success", "failure"]) {
@@ -482,66 +511,74 @@ test("failed subagents join the same result batch", async t => {
 	h.runs[0].resolve(completed("SUCCESS"));
 	h.runs[1].resolve({ ...completed(), exitCode: 1, stopReason: "error", errorMessage: "FAILURE" });
 	await flush();
-	const boundary = h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx);
-	assert.deepEqual(boundary.entries.map(entry => entry.details.failed), [false, true]);
-	assert.match(boundary.entries[1].content, /FAILURE/);
-	assert.equal(boundary.continue, true);
+	assert.equal(h.sent.length, 2);
+	assert.deepEqual(h.sent.map(item => item.message.details.failed), [false, true]);
+	assert.match(h.sent[1].message.content, /FAILURE/);
 });
 
-for (const outcome of ["aborted", "error"]) {
-	test(`result batch does not restart the agent after ${outcome}`, async t => {
-		const h = toolHarness(t);
-		h.ctx.isIdle = () => false;
-		await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
-		h.runs[0].resolve(completed());
-		await flush();
-		const boundary = h.handlers.get("agent_before_settle")({ outcome }, h.ctx);
-		assert.equal(boundary.entries.length, 1);
-		assert.equal(boundary.continue, false);
-		assert.equal(h.sent.length, 0);
-	});
-}
-
-test("aborting preserves buffered results without waking the agent", async t => {
+test("aborted worker results are retired without delivery", async t => {
 	const h = toolHarness(t);
-	h.ctx.isIdle = () => false;
 	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
-	h.runs[0].resolve(completed("BUFFERED_RESULT"));
+	h.runs[0].resolve({ ...completed(), aborted: true });
 	await flush();
-	h.handlers.get("agent_settled")({ aborted: true }, h.ctx);
-	assert.equal(h.sent.length, 1);
-	assert.equal(h.sent[0].options.triggerTurn, false);
-	assert.match(h.sent[0].message.content, /BUFFERED_RESULT/);
-	assert.equal(h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx), undefined);
+	assert.equal(h.sent.length, 0);
 });
 
-test("results arriving at settlement trigger only one new run", async t => {
-	const h = toolHarness(t);
+test("completed jobs stay as result queued until message_end retires the matching job", async t => {
+	const h = widgetHarness(t);
 	h.ctx.isIdle = () => false;
-	for (const task of ["first", "second"]) {
+	for (const task of ["inspect A", "inspect B"]) {
 		await h.tools.get("subagent").execute("call", { task }, undefined, undefined, h.ctx);
 	}
-	h.runs[0].resolve(completed("FIRST"));
-	h.runs[1].resolve(completed("SECOND"));
+	h.runs[0].resolve(completed("A"));
+	h.runs[1].resolve(completed("B"));
 	await flush();
-	h.handlers.get("agent_settled")({ aborted: false }, h.ctx);
-	assert.equal(h.sent.length, 2);
-	assert.deepEqual(h.sent.map(item => item.options.triggerTurn), [false, true]);
-	h.handlers.get("agent_settled")({ aborted: false }, h.ctx);
-	assert.equal(h.sent.length, 2);
+	assert.equal(h.render().length, 2);
+	assert.ok(h.render().every(line => line.includes("result queued")));
+	const [first, second] = h.sent;
+	const messageEnd = (customType, jobId) => ({
+		type: "message_end",
+		message: { role: "custom", customType, content: "", display: true, details: { jobId } },
+	});
+	h.handlers.get("message_end")(messageEnd("another-extension", first.message.details.jobId));
+	assert.equal(h.render().length, 2);
+	h.handlers.get("message_end")(messageEnd("subagent-result", first.message.details.jobId));
+	const remaining = h.render();
+	assert.equal(remaining.length, 1);
+	assert.match(remaining[0], /inspect B/);
+	h.handlers.get("message_end")(messageEnd("subagent-result", second.message.details.jobId));
+	assert.deepEqual(h.render(), []);
 });
 
-test("session replacement discards buffered results", async t => {
-	const h = toolHarness(t);
+test("unconfirmed results are pruned after the 60s TTL", async t => {
+	t.mock.timers.enable({ apis: ["setTimeout"] });
+	const h = widgetHarness(t);
+	h.ctx.isIdle = () => false;
+	await h.tools.get("subagent").execute("call", { task: "inspect" }, undefined, undefined, h.ctx);
+	h.runs[0].resolve(completed());
+	await flush();
+	assert.equal(h.render().length, 1);
+	t.mock.timers.tick(59_999);
+	assert.equal(h.render().length, 1);
+	t.mock.timers.tick(1);
+	assert.deepEqual(h.render(), []);
+});
+
+test("session replacement discards pending result jobs", async t => {
+	const h = widgetHarness(t);
 	h.ctx.isIdle = () => false;
 	await h.tools.get("subagent").execute("call", { task: "old session" }, undefined, undefined, h.ctx);
 	h.runs[0].resolve(completed("OLD_SESSION"));
 	await flush();
+	assert.equal(h.render().length, 1);
 	h.handlers.get("session_before_switch")();
+	assert.deepEqual(h.render(), []);
 	h.handlers.get("session_start")({}, h.ctx);
-	assert.equal(h.handlers.get("agent_before_settle")({ outcome: "completed" }, h.ctx), undefined);
-	h.handlers.get("agent_settled")({ aborted: false }, h.ctx);
-	assert.equal(h.sent.length, 0);
+	h.handlers.get("message_end")({
+		type: "message_end",
+		message: { role: "custom", customType: "subagent-result", content: "", display: true, details: { jobId: 1 } },
+	});
+	assert.deepEqual(h.render(), []);
 });
 
 test("real session consumes user follow-ups separately, then all subagent results together", { timeout: 10000 }, async t => {
@@ -623,15 +660,18 @@ test("real session consumes user follow-ups separately, then all subagent result
 	finishInitial();
 	await mainRun;
 	assert.deepEqual(errors, []);
-	assert.equal(requests.length, 4);
+	assert.equal(requests.length, 3);
 	const text = messages => messages.map(message => typeof message.content === "string"
 		? message.content : message.content.filter(part => part.type === "text").map(part => part.text).join("\n")).join("\n");
+	// Results are pending custom messages: they land at the first turn boundary
+	// without waiting for the whole run to settle.
 	assert.match(text(requests[1]), /USER_ONE/);
-	assert.doesNotMatch(text(requests[1]), /USER_TWO|RESULT_A|RESULT_B/);
+	assert.match(text(requests[1]), /RESULT_A/);
+	assert.match(text(requests[1]), /RESULT_B/);
+	assert.doesNotMatch(text(requests[1]), /USER_TWO/);
 	assert.match(text(requests[2]), /USER_TWO/);
-	assert.doesNotMatch(text(requests[2]), /RESULT_A|RESULT_B/);
-	assert.match(text(requests[3]), /RESULT_A/);
-	assert.match(text(requests[3]), /RESULT_B/);
+	assert.match(text(requests[2]), /RESULT_A/);
+	assert.match(text(requests[2]), /RESULT_B/);
 	assert.equal(session.agent.followUpMode, "one-at-a-time");
 	assert.equal(settingsManager.getFollowUpMode(), "one-at-a-time");
 	const resultEntries = session.sessionManager.getBranch().filter(entry =>
