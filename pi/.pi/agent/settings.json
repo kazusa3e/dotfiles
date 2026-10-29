@@ -9,7 +9,8 @@
         "-themes/cc-dark.json",
         "-themes/cc-light.json"
       ]
-    }
+    },
+    "npm:@llblab/pi-codex-usage"
   ],
   "theme": "soft-indigo",
   "enableSkillCommands": true,
@@ -35,10 +36,10 @@
     "+codemode"
   ],
   "enabledModels": [
-    "openai/gpt-6-astra",
     "openai/gpt-6-luna",
     "openai/gpt-6.1-sol",
-    "openrouter/deepseek/deepseek-v4.1-flash-1017"
+    "openrouter/deepseek/deepseek-v4.1-flash-1017",
+    "openai/gpt-6.1-terra"
   ],
   "defaultProvider": "openai",
   "defaultModel": "gpt-6.1-sol"

@@ -10,32 +10,47 @@
   "expandedPreviewMaxLines": 40,
   "expandedInputMaxLines": 5,
   "expandedOutputMaxLines": 10,
-  "inputClip": 100,
+  "toolLabelClip": 100,
   "useSummaryTitlesAsThinkingTitle": true,
   "previewLines": 0,
   "animationIntervalMs": 90,
-  "dimThinkingText": false,
   "showStartupHeader": true,
-  "scrollStepLines": 3,
+  "stickyUserMessage": true,
+  "scrollButtonMode": "dock",
   "enableSessionReference": true,
   "enableSubagentAutocomplete": true,
   "enableContextCommand": true,
   "enableAgentSummary": true,
   "enableWorkingMessage": true,
   "enableAliases": true,
+  "enableMarkdownEnhance": true,
+  "enableEditorPrefix": true,
   "enableCustomFooter": true,
   "footerTokenRate": false,
-  "footerTokenRateTtft": false,
+  "footerTokenRateMode": "average",
+  "footerTokenRateTtft": true,
+  "footerCurrency": "USD",
+  "footerCurrencyRate": null,
   "footerNerdIcons": true,
+  "footerGitStatsMode": "working",
   "footerHiddenKeys": [],
   "footerLine1Keys": [
+    "model",
+    "context",
+    "cache",
+    "cost",
     "pi-usage"
   ],
-  "footerLine2Keys": [],
+  "footerLine2Keys": [
+    "cwd",
+    "git"
+  ],
   "footerLine3Keys": [
     "response-ttft",
     "response-output-speed",
     "response-request-time",
-    "response-tool-time"
+    "response-tool-time",
+    "rate",
+    "aa-codex-usage"
   ]
 }
