@@ -1010,28 +1010,34 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 		},
 	});
 
-	const killAll = () => {
-		closed = true;
+	const cancelAllJobs = () => {
 		for (const job of jobs) {
 			job.aborted = true;
 			job.controller?.abort();
 			if (job.resultTimer !== undefined) clearTimeout(job.resultTimer);
 		}
 		jobs.length = 0;
-		sessionContext = undefined;
 		stopTimer();
 		clearWidget();
 	};
 
-	for (const event of ["session_before_switch", "session_before_fork", "session_before_tree", "session_shutdown"]) {
-		pi.on(event, killAll);
+	// Navigation can be cancelled, and tree navigation does not restart the session.
+	for (const event of ["session_before_switch", "session_before_fork", "session_before_tree"]) {
+		pi.on(event, cancelAllJobs);
 	}
-	pi.on("session_start", (_event, ctx) => {
-		closed = false;
-		sessionContext = ctx;
-		ui = ctx.ui;
-		syncWidget();
+	pi.on("session_shutdown", () => {
+		closed = true;
+		cancelAllJobs();
+		sessionContext = undefined;
 	});
+	for (const event of ["session_start", "session_tree"]) {
+		pi.on(event, (_event, ctx) => {
+			closed = false;
+			sessionContext = ctx;
+			ui = ctx.ui;
+			syncWidget();
+		});
+	}
 }
 
 function collapseTask(task: string): string {

@@ -591,6 +591,76 @@ test("session replacement discards pending result jobs", async t => {
 	assert.deepEqual(h.render(), []);
 });
 
+for (const event of ["session_before_tree", "session_before_switch", "session_before_fork"]) {
+	test(`${event} cleanup permits dispatch when navigation is cancelled`, async t => {
+		const h = toolHarness(t);
+		await h.tools.get("subagent").execute("old", { task: "old task" }, undefined, undefined, h.ctx);
+		h.handlers.get(event)({}, h.ctx);
+		assert.equal(h.runs[0].options.signal.aborted, true);
+		await h.tools.get("subagent").execute("new", { task: "new tool task" }, undefined, undefined, h.ctx);
+		await h.commands.get("subagent").handler("new command task", h.ctx);
+		assert.deepEqual(h.handlers.get("input")({ text: "new input task &", source: "interactive" }, h.ctx), { action: "handled" });
+		assert.equal(h.runs.length, 4);
+		h.runs[0].resolve(completed("STALE_RESULT"));
+		h.runs[1].resolve(completed("NEW_RESULT"));
+		await flush();
+		assert.equal(h.sent.length, 1);
+		assert.match(h.sent[0].message.content, /NEW_RESULT/);
+		assert.doesNotMatch(h.sent[0].message.content, /STALE_RESULT/);
+	});
+}
+
+for (const cancelled of [false, true]) {
+	test(`real tree navigation preserves subagent dispatch (cancelled=${cancelled})`, { timeout: 10000 }, async t => {
+		const { createAgentSession, createEventBus, createExtensionRuntime, ModelRuntime, SessionManager, SettingsManager } =
+			await import(pathToFileURL(`${root}/dist/index.js`));
+		const { loadExtensionFromFactory } = await import(pathToFileURL(`${root}/dist/core/extensions/loader.js`));
+		const dir = mkdtempSync(join(tmpdir(), "pi-subagent-tree-"));
+		t.after(() => rmSync(dir, { recursive: true, force: true }));
+		t.mock.method(globalThis, "fetch", () => { throw new Error("Network access is forbidden in this test"); });
+		const modelRuntime = await ModelRuntime.create({
+			authPath: join(dir, "auth.json"), modelsPath: null, modelsStorePath: join(dir, "catalog.json"),
+			refreshOnCreate: false, allowModelNetwork: false,
+		});
+		const model = modelRuntime.getModels("openai")[0];
+		assert.ok(model);
+		t.mock.method(modelRuntime, "hasConfiguredAuth", () => true);
+		const runs = [];
+		const runtime = createExtensionRuntime();
+		const loaded = await loadExtensionFromFactory(pi => {
+			extension(pi, options => new Promise(resolve => runs.push({ options, resolve })), { display: { statusBar: "hidden" } });
+			if (cancelled) pi.on("session_before_tree", () => ({ cancel: true }));
+		}, dir, createEventBus(), runtime);
+		const resourceLoader = {
+			getExtensions: () => ({ extensions: [loaded], errors: [], runtime }),
+			getSkills: () => ({ skills: [], diagnostics: [] }), getPrompts: () => ({ prompts: [], diagnostics: [] }),
+			getThemes: () => ({ themes: [], diagnostics: [] }), getAgentsFiles: () => ({ agentsFiles: [] }),
+			getSystemPrompt: () => "Test assistant", getSystemPromptSource: () => undefined,
+			getAppendSystemPrompt: () => [], getAppendSystemPromptSources: () => [],
+			extendResources() {}, reload: async () => {},
+		};
+		const sessionManager = SessionManager.inMemory(dir);
+		const targetId = sessionManager.appendMessage({ role: "user", content: "Earlier prompt", timestamp: Date.now() });
+		sessionManager.appendMessage({ role: "user", content: "Later prompt", timestamp: Date.now() });
+		const { session } = await createAgentSession({
+			cwd: dir, agentDir: dir, model, modelRuntime, resourceLoader, sessionManager, tools: [], thinkingLevel: "off",
+			settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, cacheWarming: "off" }),
+		});
+		t.after(() => session.dispose());
+		const errors = [];
+		await session.bindExtensions({ mode: "print", onError: error => errors.push(error) });
+		await session.prompt("/subagent before navigation");
+		assert.equal(runs.length, 1);
+		const result = await session.navigateTree(targetId, { summarize: false });
+		assert.equal(result.cancelled, cancelled);
+		assert.equal(runs[0].options.signal.aborted, true);
+		await session.prompt("/subagent after navigation");
+		assert.equal(runs.length, 2);
+		assert.equal(runs[1].options.task, "after navigation");
+		assert.deepEqual(errors, []);
+	});
+}
+
 test("real session consumes user follow-ups separately, then all subagent results together", { timeout: 10000 }, async t => {
 	const {
 		createAgentSession, createEventBus, createExtensionRuntime, ModelRuntime, SessionManager, SettingsManager,
@@ -883,6 +953,7 @@ test("background jobs outlive the dispatch signal but are cancelled with the ses
 	h.runs[0].resolve(completed());
 	await flush();
 	assert.equal(h.sent.length, 0);
+	h.handlers.get("session_shutdown")();
 	await assert.rejects(tool.execute("call", { task: "inspect" }, undefined, undefined, h.ctx), /current session/);
 });
 
