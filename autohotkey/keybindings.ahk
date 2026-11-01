@@ -1,4 +1,4 @@
-#Requires AutoHotkey v2.0
+﻿#Requires AutoHotkey v2.0
 
 ; caps to toggle ime
 CapsLock::Send "^#{Space}"
