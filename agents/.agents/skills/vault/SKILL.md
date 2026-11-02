@@ -1,9 +1,6 @@
 ---
 name: vault
 description: "Access the user's personal note vault to retrieve past records, preferences, and decisions, or manage personal tasks, daily planning, reviews, and persistent notes. Use for vault-backed memory and task management, not ordinary coding task breakdowns."
-disable-model-invocation: false
-metadata:
-  opencode/autoinvoke: "true"
 ---
 
 # Vault

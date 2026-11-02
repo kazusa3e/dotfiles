@@ -1,10 +1,6 @@
 ---
 name: guideme
 description: Coach the user through a goal or plan in the current conversation when explicitly invoked.
-disable-model-invocation: true
-hide: true
-metadata:
-  opencode/autoinvoke: "false"
 ---
 
 # Guide mode

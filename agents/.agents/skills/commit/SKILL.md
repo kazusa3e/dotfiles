@@ -1,10 +1,6 @@
 ---
 name: commit
 description: Create a commit from relevant changes in the current repository. Use when the user asks to commit changes or write and create a Git commit.
-disable-model-invocation: false
-hide: false
-metadata:
-  opencode/autoinvoke: "true"
 ---
 
 # Commit

@@ -1,10 +1,6 @@
 ---
 name: grill-with-docs
 description: Interview the user about a plan or design and record settled terms and decisions when explicitly invoked.
-disable-model-invocation: true
-hide: true
-metadata:
-  opencode/autoinvoke: "false"
 ---
 
 # Grill With Docs

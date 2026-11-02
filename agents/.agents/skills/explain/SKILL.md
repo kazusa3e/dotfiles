@@ -1,10 +1,6 @@
 ---
 name: explain
 description: Explain a concept or question clearly when explicitly invoked.
-disable-model-invocation: true
-hide: true
-metadata:
-  opencode/autoinvoke: "false"
 ---
 
 # Explain

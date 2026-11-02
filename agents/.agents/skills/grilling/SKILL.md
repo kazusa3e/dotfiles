@@ -1,10 +1,6 @@
 ---
 name: grilling
 description: Stress-test a plan, decision, or idea through an explicit interview.
-disable-model-invocation: true
-hide: true
-metadata:
-  opencode/autoinvoke: "false"
 ---
 
 # Grilling
