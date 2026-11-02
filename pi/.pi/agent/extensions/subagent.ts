@@ -355,6 +355,8 @@ export interface InjectedSummary {
 	toolCalls: { name: string; args: unknown }[];
 	toolCallCount?: number;
 	toolCallMode: "compact" | "none";
+	model?: string;
+	thinkingLevel?: string;
 }
 
 interface ResultDetails {
@@ -373,6 +375,8 @@ function buildResultHeader(summary: InjectedSummary): string {
 	const usage = summary.usage;
 	if (usage.input || usage.output) stats.push(`↑${formatTokens(usage.input)} ↓${formatTokens(usage.output)}`);
 	if (usage.cost > 0) stats.push(`$${usage.cost.toFixed(4)}`);
+	if (summary.model) stats.push(summary.model);
+	if (summary.thinkingLevel) stats.push(`thinking: ${summary.thinkingLevel}`);
 	stats.push(formatElapsed(summary.elapsedMs));
 	const jobLabel = summary.jobId === undefined ? "" : ` #${summary.jobId}`;
 	return `[subagent ${summary.kind}${jobLabel}] ${summary.failed ? "failed" : "done"} · ${stats.join(" · ")}`;
@@ -866,6 +870,10 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 			toolCalls: toolCalls.slice(-MAX_RESULT_TOOL_CALLS),
 			toolCallCount: toolCalls.length,
 			toolCallMode: config.injectedToolCalls,
+			model: result.model
+				? `${job.provider ? `${job.provider}/` : ""}${result.model}`
+				: job.model ? `${job.provider ? `${job.provider}/` : ""}${job.model}` : undefined,
+			thinkingLevel: job.thinkingLevel,
 		};
 		const content = buildInjectedContent(summary);
 		const message: CustomMessageEntryDraft = {
@@ -886,7 +894,8 @@ export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown 
 				reason,
 				exitCode: job.exitCode,
 				stopReason: job.stopReason,
-				model: result.model,
+				model: summary.model,
+				thinkingLevel: summary.thinkingLevel,
 				turns: job.turns,
 				usage: job.usage,
 			},
