@@ -17,7 +17,10 @@
  *     A 60s TTL retires jobs whose confirmation never arrives.
  *   - Only the "worker" kind exists; the kind registry leaves room for more.
  *   - No depth limit / no nested spawn: child processes get PI_SUBAGENT_CHILD=1
- *     and never react to `&` or /subagent.
+ *     and never react to `&` or /subagent. The worker role joins the child's
+ *     prompt via before_agent_start (PI_SUBAGENT_KIND names the kind), so the
+ *     child keeps the agent's APPEND_SYSTEM.md; `--append-system-prompt` would
+ *     replace that file instead.
  *
  * Config: {PI_CODING_AGENT_DIR|~/.pi/agent}/pi-subagent.json
  *   - maxConcurrent (default 8): running cap; extra jobs queue FIFO.
@@ -177,7 +180,7 @@ export function splitTrailingAmpersand(text: string): { task: string; triggered:
 
 export interface SubagentKind {
 	name: string;
-	/** Appended to the worker's system prompt. */
+	/** Added to the worker's system prompt, after the agent's APPEND_SYSTEM.md. */
 	systemPrompt: string;
 }
 
@@ -512,12 +515,10 @@ async function runChild(options: {
 	signal?: AbortSignal;
 	onMessage?: (message: Message) => void;
 }): Promise<RunResult> {
-	const kind = SUBAGENT_KINDS[options.kind];
 	const args = ["--mode", "json", "-p", "--no-session"];
 	if (options.provider) args.push("--provider", options.provider);
 	if (options.model) args.push("--model", options.model);
 	if (options.thinkingLevel) args.push("--thinking", options.thinkingLevel);
-	if (kind) args.push("--append-system-prompt", kind.systemPrompt);
 	args.push(`Task: ${options.task}`);
 
 	const result: RunResult = {
@@ -534,7 +535,7 @@ async function runChild(options: {
 		cwd: options.cwd,
 		shell: false,
 		stdio: ["ignore", "pipe", "pipe"],
-		env: { ...process.env, PI_SUBAGENT_CHILD: "1" },
+		env: { ...process.env, PI_SUBAGENT_CHILD: "1", PI_SUBAGENT_KIND: options.kind },
 	});
 	let buffer = "";
 
@@ -661,7 +662,20 @@ function getToolCalls(messages: Message[]): { name: string; args: unknown }[] {
 export default function (pi: ExtensionAPI, run = runChild, inputConfig: unknown = loadSubagentConfig()): void {
 	// Set when spawned as a subagent child: never re-spawn, never transform.
 	const isChild = process.env.PI_SUBAGENT_CHILD === "1";
-	if (isChild) return;
+	if (isChild) {
+		// `--append-system-prompt` replaces the agent's APPEND_SYSTEM.md instead of joining it, so the
+		// worker role is added here and the user's global conventions reach the child too.
+		const kind = SUBAGENT_KINDS[process.env.PI_SUBAGENT_KIND ?? "worker"];
+		if (kind) {
+			pi.on("before_agent_start", (event) => {
+				const { appendSystemPrompt } = event.systemPromptOptions;
+				event.systemPromptOptions.appendSystemPrompt = appendSystemPrompt
+					? `${appendSystemPrompt}\n\n${kind.systemPrompt}`
+					: kind.systemPrompt;
+			});
+		}
+		return;
+	}
 	const config = normalizeSubagentConfig(inputConfig);
 
 	pi.registerMessageRenderer<ResultDetails>("subagent-result", (message, { expanded, outputPad }, theme) => {
