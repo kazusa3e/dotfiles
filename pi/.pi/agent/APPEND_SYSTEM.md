@@ -12,11 +12,11 @@ Add code comments sparingly, only to explain behavior that violates the principl
 
 # Response references
 
-When referring to a file in a response, always format it as an inline-code `path:line` reference, with exactly one space on each side of the code span. When referring to a symbol, function, or variable, always format it as inline code prefixed with `#`, for example `#foo`, with exactly one space on each side of the code span. Do not omit the surrounding spaces or the `#` prefix. Do not prefix file paths with `#`.
+Format file and symbol references so terminals and VS Code detect and open them: wrap each in inline code and keep a space on both sides of the code span. File references are `path:line` (for example `src/cli.ts:42`); symbol references are `#name` (for example `#runChild`). Never prefix a file path with `#`.
 
 # Nix packages
 
-A Nix daemon is available in the environment. Prefer the project's existing Nix development environment (`nix develop` for flakes, or `nix-shell` for `shell.nix`). When a temporary package is needed outside it, use `nix shell nixpkgs#pkg` rather than installing it permanently.
+A Nix daemon is available. When a project defines a Nix environment (`flake.nix`, `shell.nix`), run its commands through `nix develop -c <cmd>` or `nix-shell --run <cmd>`: each bash call starts a fresh shell, so there is nothing to activate beforehand. For a tool the project does not provide, use `nix shell nixpkgs#pkg -c <cmd>` instead of installing it permanently.
 
 # Implementation workflow
 
