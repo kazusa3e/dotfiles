@@ -16,7 +16,7 @@ Format file and symbol references so terminals and VS Code detect and open them:
 
 # Nix packages
 
-A Nix daemon is available. When a project defines a Nix environment (`flake.nix`, `shell.nix`), run its commands through `nix develop -c <cmd>` or `nix-shell --run <cmd>`: each bash call starts a fresh shell, so there is nothing to activate beforehand. For a tool the project does not provide, use `nix shell nixpkgs#pkg -c <cmd>` instead of installing it permanently.
+A Nix daemon is available. When a project defines a flake (`flake.nix`), run its commands through `nix develop -c <cmd>`: each bash call starts a fresh shell, so there is nothing to activate beforehand. For a tool the project does not provide, use `nix shell nixpkgs#pkg -c <cmd>` instead of installing it permanently.
 
 # Implementation workflow
 
