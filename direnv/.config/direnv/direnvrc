@@ -1,0 +1,11 @@
+for profile in \
+  "$HOME/.nix-profile" \
+  "/etc/profiles/per-user/$USER" \
+  "/run/current-system/sw"
+do
+  if [[ -r "$profile/share/nix-direnv/direnvrc" ]]; then
+    source "$profile/share/nix-direnv/direnvrc"
+    break
+  fi
+done
+unset profile
