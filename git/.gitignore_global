@@ -5,7 +5,7 @@ cmd.mk
 .vscode/
 
 .envrc
-/.direnv
+.direnv/
 
 .clangd
 .cache/
