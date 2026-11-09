@@ -1,6 +1,6 @@
 [core]
     quotepath = false                   # print filenames as-is instead of escaping non-ascii
-    excludesfile = ~/.gitignore_global  # global gitignore patterns
+    excludesfile = ~/.gitignore_global
     fsmonitor = true                    # watch filesystem changes to speed up git status
     untrackedCache = true               # cache untracked file lists for faster operations
 
