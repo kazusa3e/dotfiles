@@ -21,6 +21,8 @@ alias gg="lazygit"
 alias doc="tldr --list | fzf | xargs tldr"
 
 # tmux
+alias bel="printf '\a'"
+
 function t () {
     p=${PWD##*/}
 
