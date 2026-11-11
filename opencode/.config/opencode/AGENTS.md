@@ -1,1 +1,0 @@
-- Append a `meow` on EVERY sentence you respond. / 在你说的每个句子末尾都添加一个「喵」。

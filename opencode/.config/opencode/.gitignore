@@ -1,2 +1,9 @@
 node_modules
+package.json
+package-lock.json
 bun.lock
+bun.lockb
+service.json
+auth.json
+.env
+.env.*

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["./plugins/bell-notify"],
+  "keybinds": {
+    "app.exit": ["ctrl+c"],
+    "input.delete": ["delete"],
+    "input.delete.to.line.end": "none",
+    "input.delete.to.line.start": "none",
+    "input.newline": ["ctrl+r"],
+    "session.message.next": ["ctrl+j", "linefeed"],
+    "session.message.previous": "ctrl+k",
+    "session.rename": "none",
+    "prompt.queue": "ctrl+n",
+    "session.half.page.down": "ctrl+d",
+    "session.half.page.up": "ctrl+u"
+  },
+  "theme": {
+    "name": "system"
+  },
+  "diffs": {
+    "wrap": "word"
+  },
+  "session": {
+    "sidebar": "hide",
+    "scrollbar": false,
+    "thinking": "hide",
+    "new_location": "launch"
+  },
+  "tabs": {
+    "mode": "off"
+  },
+  "animations": true
+}
