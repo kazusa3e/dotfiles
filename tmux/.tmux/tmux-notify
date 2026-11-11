@@ -3,7 +3,7 @@ set -euo pipefail
 
 pending() {
   tmux list-panes -a -f '#{@bell_order}' -F \
-    $'#{@bell_order}\t#{pane_id}\t#{session_id}:#{window_id}.#{pane_id}\t#{=/12/…:session_name}:#{window_name}' |
+    $'#{@bell_order}\t#{pane_id}\t#{session_id}:#{window_id}.#{pane_id}\t#{=/20/…:session_name}:#{window_name}' |
     LC_ALL=C sort -t $'\t' -k1,1n -k2,2 |
     awk -F '\t' '!seen[$2]++'
 }
