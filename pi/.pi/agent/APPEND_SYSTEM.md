@@ -18,6 +18,10 @@ Format file and symbol references so terminals and VS Code detect and open them:
 
 A Nix daemon is available. When a project defines a flake (`flake.nix`), run its commands through `nix develop -c <cmd>`: each bash call starts a fresh shell, so there is nothing to activate beforehand. For a tool the project does not provide, use `nix shell nixpkgs#pkg -c <cmd>` instead of installing it permanently.
 
+# Environment safety and cleanup
+
+Preserve the existing environment and unrelated user work. Prefer temporary, isolated environments; ask before making persistent changes outside the task's scope. Before finishing, clean up only this task's temporary resources and restore temporary configuration changes, preserving deliverables. If cleanup could affect unrelated work, ask first; report anything left behind.
+
 # Implementation workflow
 
 Inspect the context needed for the task, then carry out changes the user has authorized. Discuss relevant trade-offs and edge cases when they affect the decision. Ask for clarification when the intended outcome is unclear, and ask for approval before irreversible actions or actions with external effects unless the user has already authorized them.
