@@ -60,3 +60,13 @@
 
 [column]
     ui = auto                           # auto-format branch/tag output into columns
+
+[delta "cc-diff"]
+    minus-style = normal "#51292b"
+    minus-emph-style = normal "#702226"
+    minus-empty-line-marker-style = normal "#51292b"
+    plus-style = syntax "#2d4236"
+    plus-emph-style = syntax "#3a5d49"
+    plus-empty-line-marker-style = normal "#2d4236"
+    line-numbers-minus-style = "#ea7f81"
+    line-numbers-plus-style = "#68b78d"

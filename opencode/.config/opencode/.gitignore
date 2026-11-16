@@ -1,3 +1,6 @@
+/opencode.jsonc
+/cli.json
+/skills
 node_modules
 package.json
 package-lock.json

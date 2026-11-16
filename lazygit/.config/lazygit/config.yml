@@ -3,4 +3,6 @@ promptToReturnFromSubprocess: false
 
 git:
   diffRenderers:
-    - command: delta --{{colorScheme}} --paging=never
+    - command: >-
+        delta --{{colorScheme}} --paging=never
+        {{if eq .colorScheme "dark"}}--features=cc-diff{{end}}

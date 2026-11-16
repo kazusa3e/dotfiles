@@ -1,4 +1,6 @@
 ^Makefile$
+^\.local$
+^settings\.base\.json$
 ^pid\.Dockerfile$
 ^pid-entrypoint$
 ^pid-shell\.nix$
