@@ -1,2 +1,6 @@
-# Disable the "press enter to return to lazygit" prompt after a subprocess exits
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jesseduffield/lazygit/v0.66.3/schema/config.json
 promptToReturnFromSubprocess: false
+
+git:
+  diffRenderers:
+    - command: delta --{{colorScheme}} --paging=never
