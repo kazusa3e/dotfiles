@@ -10,6 +10,8 @@
     "session.message.next": ["ctrl+j", "linefeed"],
     "session.message.previous": "ctrl+k",
     "session.rename": "none",
+    "session.first": "none",
+    "prompt.editor": "ctrl+g",
     "prompt.queue": "ctrl+n",
     "session.half.page.down": "ctrl+d",
     "session.half.page.up": "ctrl+u"
