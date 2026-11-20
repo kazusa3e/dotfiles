@@ -1,0 +1,25 @@
+{
+  "$docs": "https://code.claude.com/docs/en/keybindings",
+  "bindings": [
+    {
+      "context": "Global",
+      "bindings": {
+        "meta+r": "history:search"
+      }
+    },
+    {
+      "context": "Chat",
+      "bindings": {
+        "ctrl+n": "chat:queueSubmit",
+        "ctrl+r": "chat:newline",
+        "ctrl+j": null
+      }
+    },
+    {
+      "context": "Scroll",
+      "bindings": {
+        "ctrl+u": "scroll:halfPageUp"
+      }
+    }
+  ]
+}

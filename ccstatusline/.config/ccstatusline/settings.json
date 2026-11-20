@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "lines": [
     [
       {
@@ -97,8 +97,6 @@
     ],
     []
   ],
-  "flexMode": "full-minus-40",
-  "compactThreshold": 60,
   "colorLevel": 2,
   "inheritSeparatorColors": true,
   "globalBold": true,
@@ -116,9 +114,5 @@
     "endCaps": [],
     "autoAlign": false,
     "continueThemeAcrossLines": false
-  },
-  "installation": {
-    "method": "pinned",
-    "installedVersion": "2.2.22"
   }
 }

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0",
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Bash(git log *)",
+      "Bash(git diff *)"
+    ],
+    "ask": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Read(outside)",
+      "Write(outside)",
+      "Bash(rm *)",
+      "Bash(mv *)"
+    ],
+    "defaultMode": "plan"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v ccstatusline >/dev/null 2>&1 || exit 0; exec ccstatusline \"$@\"' ccstatusline --hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v ccstatusline >/dev/null 2>&1 || exit 0; exec ccstatusline \"$@\"' ccstatusline --hook"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "sh -c 'command -v ccstatusline >/dev/null 2>&1 || exit 0; exec ccstatusline \"$@\"' ccstatusline",
+    "padding": 0,
+    "refreshInterval": 10
+  },
+  "enabledPlugins": {
+    "clangd-lsp@claude-plugins-official": true
+  },
+  "effortLevel": "medium",
+  "theme": "auto",
+  "verbose": false,
+  "autoCompactEnabled": false,
+  "fileCheckpointingEnabled": true,
+  "terminalProgressBarEnabled": false,
+  "skipAutoPermissionPrompt": true,
+  "useAutoModeDuringPlan": false
+}

@@ -1,7 +1,7 @@
 os := $(shell uname -s)
 tmux_plugin_dir := ~/.tmux/plugins
 # app := zsh vim tmux starship git clangd lazygit alacritty yazi npm claude ccstatusline opencode
-app := zsh vim tmux starship git npm pi opencode lazygit yazi direnv
+app := zsh vim tmux starship git npm pi opencode lazygit yazi direnv claude ccstatusline
 binaries := pid repostatus todo
 
 ifeq ($(os),Darwin)
@@ -17,10 +17,11 @@ agent-config:
 	@python3 scripts/json-merge.py pi/settings.base.json "$(HOME)/.pi/agent/settings.json"
 	@python3 scripts/json-merge.py opencode/opencode.base.json "$(HOME)/.config/opencode/opencode.jsonc"
 	@python3 scripts/json-merge.py opencode/cli.base.json "$(HOME)/.config/opencode/cli.json"
+	@python3 scripts/json-merge.py claude/settings.base.json "$(HOME)/.claude/settings.json"
 
 .PHONY: install
 install:
-	mkdir -p $(tmux_plugin_dir)
+	mkdir -p $(tmux_plugin_dir) "$(HOME)/.claude"
 	stow -t ~ $(app)
 
 	$(MAKE) agent-config
